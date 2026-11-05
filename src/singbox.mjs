@@ -64,7 +64,7 @@ function nodeOutbound(node) {
 }
 
 function remoteDns(address) {
-  const value = String(address || 'https://223.5.5.5/dns-query').trim();
+  const value = String(address || 'https://1.1.1.1/dns-query').trim();
   const url = new URL(value.includes('://') ? value : 'udp://' + (isIP(value) === 6 ? '[' + value + ']' : value));
   if (url.protocol === 'quic:') throw new Error('这条Worker链路不能转发QUIC DNS，请改用HTTPS、TLS或TCP地址。');
   // Worker出口走TCP。普通DNS使用同地址的TCP入口，HTTP3地址沿用HTTPS入口。

@@ -50,15 +50,15 @@ let 传输路径 = '';
 
 let 启用加密客户端问候 = false;
 
-let 自定义域名系统 = 'https://223.5.5.5/dns-query';
+let 自定义域名系统 = 'https://1.1.1.1/dns-query';
 
 let 自定义加密客户端问候域名 = 'cloudflare-ech.com';
 
 let 自定义应用层协议协商 = '';
 
-let 订阅转换接口 = 解码64('aHR0cHM6Ly91cmwudjEubWsvc3Vi');
+let 订阅转换接口 = '';
 
-const 远程配置网址 = 'https://raw.githubusercontent.com/byJoey/test/refs/heads/main/tist.ini';
+const 远程配置网址 = 'https://raw.githubusercontent.com/tony188/cfnew-panel/main/assets/tist.ini';
 
 let 启用优选域名 = true;
 
@@ -81,7 +81,7 @@ const 配置默认值 = {
   ex: 'no',
   ech: 'no',
   tp: '',
-  customDNS: 'https://223.5.5.5/dns-query',
+  customDNS: 'https://1.1.1.1/dns-query',
   customECHDomain: 'cloudflare-ech.com',
   alpn: '',
   d: '',
@@ -90,10 +90,10 @@ const 配置默认值 = {
   yxURL: '',
   s: '',
   homepage: '',
-  scu: 解码64('aHR0cHM6Ly91cmwudjEubWsvc3Vi'),
+  scu: '',
   ena: 'no',
   epd: 'yes',
-  epi: 'yes',
+  epi: 'no',
   egi: 'yes',
   ae: '',
   rm: '',
@@ -632,8 +632,8 @@ function 构建值节点行(数量值596) {
 function 生成值值589(链接列表588, 本地值587 = {}) {
   const 节点列表586 = normalizeNodeNames(链接列表588.map(解析值链接).filter(数量值585 => 数量值585 && (数量值585.proto === 解码64('dmxlc3M=') || 数量值585.proto === 解码64('dHJvamFu'))));
   const 名称列表584 = 节点列表586.map(数量值583 => 数量值583.name);
-  const 域名系统值582 = 自定义域名系统 || 'https://223.5.5.5/dns-query';
-  const 头部581 = ['mixed-port: 7890', 'allow-lan: true', 'mode: rule', 'log-level: info', 'ipv6: true', 'external-controller: 127.0.0.1:9090', 'unified-delay: true', 'tcp-concurrent: true', 'geodata-mode: true', 'geo-auto-update: true', 'geo-update-interval: 24', 'geox-url:', '  geoip: "https://fastly.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@release/geoip.dat"', '  geosite: "https://fastly.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@release/geosite.dat"', '  mmdb: "https://fastly.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@release/country.mmdb"', '  asn: "https://fastly.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@release/GeoLite2-ASN.mmdb"', 'sniffer:', '  enable: true', '  force-dns-mapping: true', '  parse-pure-ip: true', '  sniff:', '    HTTP:', '      ports: [80, 8080-8880]', '      override-destination: true', '    TLS:', '      ports: [443, 8443]', '    QUIC:', '      ports: [443, 8443]', 'dns:', '  enable: true', '  listen: 0.0.0.0:1053', '  ipv6: true', '  enhanced-mode: fake-ip', '  fake-ip-range: 198.18.0.1/16', '  fake-ip-filter:', '    - "*.lan"', '    - "+.local"', '    - "+.market.xiaomi.com"', '    - "+.msftconnecttest.com"', '    - "+.msftncsi.com"', '    - "localhost.ptlogin2.qq.com"', '    - "+.srv.nintendo.net"', '    - "+.stun.playstation.net"', '    - "+.xboxlive.com"', '  default-nameserver:', '    - 223.5.5.5', '    - 119.29.29.29', '  nameserver:', `    - ${域名系统值582}`, '    - https://119.29.29.29/dns-query', '  fallback:', '    - https://1.1.1.1/dns-query', '    - https://8.8.8.8/dns-query', '  fallback-filter:', '    geoip: true', '    geoip-code: CN', '    ipcidr:', '      - 240.0.0.0/4', ''];
+  const 域名系统值582 = 自定义域名系统 || 'https://1.1.1.1/dns-query';
+  const 头部581 = ['mixed-port: 7890', 'allow-lan: true', 'mode: rule', 'log-level: info', 'ipv6: true', 'external-controller: 127.0.0.1:9090', 'unified-delay: true', 'tcp-concurrent: true', 'geodata-mode: true', 'geo-auto-update: true', 'geo-update-interval: 24', 'geox-url:', '  geoip: "https://fastly.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@release/geoip.dat"', '  geosite: "https://fastly.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@release/geosite.dat"', '  mmdb: "https://fastly.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@release/country.mmdb"', '  asn: "https://fastly.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@release/GeoLite2-ASN.mmdb"', 'sniffer:', '  enable: true', '  force-dns-mapping: true', '  parse-pure-ip: true', '  sniff:', '    HTTP:', '      ports: [80, 8080-8880]', '      override-destination: true', '    TLS:', '      ports: [443, 8443]', '    QUIC:', '      ports: [443, 8443]', 'dns:', '  enable: true', '  listen: 0.0.0.0:1053', '  ipv6: true', '  enhanced-mode: fake-ip', '  fake-ip-range: 198.18.0.1/16', '  fake-ip-filter:', '    - "*.lan"', '    - "+.local"', '    - "+.market.xiaomi.com"', '    - "+.msftconnecttest.com"', '    - "+.msftncsi.com"', '    - "localhost.ptlogin2.qq.com"', '    - "+.srv.nintendo.net"', '    - "+.stun.playstation.net"', '    - "+.xboxlive.com"', '  default-nameserver:', '    - 1.1.1.1', '    - 8.8.8.8', '  nameserver:', `    - ${域名系统值582}`, '    - https://dns.google/dns-query', '  fallback:', '    - https://1.1.1.1/dns-query', '    - https://8.8.8.8/dns-query', '  fallback-filter:', '    geoip: true', '    geoip-code: CN', '    ipcidr:', '      - 240.0.0.0/4', ''];
   const 值值580 = ['proxies:'];
   for (const 数量值579 of 节点列表586) 值值580.push(构建值节点行(数量值579));
   const 节点仅 = 名称列表584.length ? 名称列表584.map(数量值578 => `      - ${处理本地值622(数量值578)}`).join('\n') : '      - DIRECT';
@@ -667,9 +667,9 @@ const 值规则 = 名称563 => `${值基础}/${名称563}.list`;
 
 function 生成值值562(链接列表561) {
   const 节点列表560 = 链接列表561.map(解析值链接).filter(数量值559 => 数量值559 && 数量值559.proto === 解码64('dHJvamFu'));
-  const 域名系统值558 = 自定义域名系统 || '223.5.5.5';
+  const 域名系统值558 = 自定义域名系统 || '1.1.1.1';
   const 名称列表557 = 节点列表560.map(数量值556 => 数量值556.name);
-  const 行列表555 = ['[General]', 'loglevel = notify', 'internet-test-url = http://www.apple.com/library/test/success.html', 解码64('cHJveHktdGVzdC11cmwgPSBodHRwOi8vd3d3LmdzdGF0aWMuY29tL2dlbmVyYXRlXzIwNA=='), 'test-timeout = 3', `dns-server = ${域名系统值558.replace(/^https?:\/\//, '').replace(/\/.*$/, '')}, 119.29.29.29, system`, 'encrypted-dns-server = https://223.5.5.5/dns-query, https://1.12.12.12/dns-query', 'ipv6 = true', 'allow-wifi-access = false', 'wifi-access-http-port = 6152', 解码64('d2lmaS1hY2Nlc3Mtc29ja3M1LXBvcnQgPSA2MTUz'), 解码64('c2tpcC1wcm94eSA9IDEyNy4wLjAuMSwgMTkyLjE2OC4wLjAvMTYsIDEwLjAuMC4wLzgsIDE3Mi4xNi4wLjAvMTIsIGxvY2FsaG9zdCwgKi5sb2NhbCwgY2FwdGl2ZS5hcHBsZS5jb20='), 'exclude-simple-hostnames = true', 'show-error-page-for-reject = true', '', 解码64('W1Byb3h5XQ==')];
+  const 行列表555 = ['[General]', 'loglevel = notify', 'internet-test-url = http://www.apple.com/library/test/success.html', 解码64('cHJveHktdGVzdC11cmwgPSBodHRwOi8vd3d3LmdzdGF0aWMuY29tL2dlbmVyYXRlXzIwNA=='), 'test-timeout = 3', `dns-server = ${域名系统值558.replace(/^https?:\/\//, '').replace(/\/.*$/, '')}, 8.8.8.8, system`, 'encrypted-dns-server = https://cloudflare-dns.com/dns-query, https://dns.google/dns-query', 'ipv6 = true', 'allow-wifi-access = false', 'wifi-access-http-port = 6152', 解码64('d2lmaS1hY2Nlc3Mtc29ja3M1LXBvcnQgPSA2MTUz'), 解码64('c2tpcC1wcm94eSA9IDEyNy4wLjAuMSwgMTkyLjE2OC4wLjAvMTYsIDEwLjAuMC4wLzgsIDE3Mi4xNi4wLjAvMTIsIGxvY2FsaG9zdCwgKi5sb2NhbCwgY2FwdGl2ZS5hcHBsZS5jb20='), 'exclude-simple-hostnames = true', 'show-error-page-for-reject = true', '', 解码64('W1Byb3h5XQ==')];
   for (const 数量值554 of 节点列表560) {
     const 服务名称指示 = 数量值554.sni;
     行列表555.push(`${数量值554.name} = ${解码64('dHJvamFu')}, ${数量值554.server}, ${数量值554.port}, password=${数量值554.password}, sni=${服务名称指示}, ws=true, ws-path=${数量值554.path}, ws-headers=Host:${数量值554.host}, skip-cert-verify=false, tfo=true`);
@@ -737,7 +737,7 @@ function 生成值值562(链接列表561) {
 function 生成值值552(链接列表551) {
   const 节点列表550 = 链接列表551.map(解析值链接).filter(数量值549 => 数量值549 && (数量值549.proto === 解码64('dmxlc3M=') || 数量值549.proto === 解码64('dHJvamFu')));
   const 名称列表548 = 节点列表550.map(数量值547 => 数量值547.name);
-  const 行列表546 = ['[General]', 'ip-mode = dual', `dns-server = ${(自定义域名系统 || '223.5.5.5').replace(/^https?:\/\//, '').replace(/\/.*$/, '')},119.29.29.29,system`, 'doh-server = https://223.5.5.5/dns-query, https://1.12.12.12/dns-query', 解码64('YWxsb3ctdWRwLXByb3h5ID0gdHJ1ZQ=='), 'allow-wifi-access = false', 'sni-sniffing = true', 解码64('c2tpcC1wcm94eSA9IDEyNy4wLjAuMSwxOTIuMTY4LjAuMC8xNiwxMC4wLjAuMC84LDE3Mi4xNi4wLjAvMTIsbG9jYWxob3N0LCoubG9jYWwsY2FwdGl2ZS5hcHBsZS5jb20='), 'bypass-tun = 10.0.0.0/8,100.64.0.0/10,127.0.0.0/8,169.254.0.0/16,172.16.0.0/12,192.0.0.0/24,192.0.2.0/24,192.88.99.0/24,192.168.0.0/16,198.51.100.0/24,203.0.113.0/24,224.0.0.0/4,255.255.255.255/32', '', 解码64('W1Byb3h5XQ==')];
+  const 行列表546 = ['[General]', 'ip-mode = dual', `dns-server = ${(自定义域名系统 || '1.1.1.1').replace(/^https?:\/\//, '').replace(/\/.*$/, '')},8.8.8.8,system`, 'doh-server = https://cloudflare-dns.com/dns-query, https://dns.google/dns-query', 解码64('YWxsb3ctdWRwLXByb3h5ID0gdHJ1ZQ=='), 'allow-wifi-access = false', 'sni-sniffing = true', 解码64('c2tpcC1wcm94eSA9IDEyNy4wLjAuMSwxOTIuMTY4LjAuMC8xNiwxMC4wLjAuMC84LDE3Mi4xNi4wLjAvMTIsbG9jYWxob3N0LCoubG9jYWwsY2FwdGl2ZS5hcHBsZS5jb20='), 'bypass-tun = 10.0.0.0/8,100.64.0.0/10,127.0.0.0/8,169.254.0.0/16,172.16.0.0/12,192.0.0.0/24,192.0.2.0/24,192.88.99.0/24,192.168.0.0/16,198.51.100.0/24,203.0.113.0/24,224.0.0.0/4,255.255.255.255/32', '', 解码64('W1Byb3h5XQ==')];
   for (const 数量值545 of 节点列表550) {
     if (数量值545.proto === 解码64('dmxlc3M=')) {
       const 部分列表544 = [`${数量值545.server}`, `${数量值545.port}`, `udp=true`, `username=${数量值545.uuid}`, `transport=ws`, `path=${数量值545.path}`, `host=${数量值545.host}`, `over-tls=${数量值545.tls ? 'true' : 'false'}`];
@@ -827,7 +827,7 @@ function 生成值值(链接列表541) {
   const 节点列表 = 链接列表541.map(解析值链接).filter(数量值540 => 数量值540 && (数量值540.proto === 解码64('dmxlc3M=') || 数量值540.proto === 解码64('dHJvamFu')));
   const 名称列表 = 节点列表.map(数量值539 => 数量值539.name);
   const 圈叉基础配置 = 解码64('aHR0cHM6Ly9mYXN0bHkuanNkZWxpdnIubmV0L2doL2JsYWNrbWF0cml4Ny9pb3NfcnVsZV9zY3JpcHRAbWFzdGVyL3J1bGUvUXVhbnR1bXVsdFg=');
-  const 行列表538 = ['[general]', 'network_check_url=http://www.gstatic.com/generate_204', 'server_check_url=http://www.gstatic.com/generate_204', 'profile_img_url=https://fastly.jsdelivr.net/gh/byJoey/cfnew@main/snippets/logo.png', 'dns_exclusion_list=*.cmpassport.com, *.jegotrip.com.cn, *.icloud.com, *.icloud.com.cn, *.apple.com, *.weibo.com, *.qq.com', 'running_mode_trigger=filter', '', '[dns]', `server=${(自定义域名系统 || '223.5.5.5').replace(/^https?:\/\//, '').replace(/\/.*$/, '')}`, 'server=119.29.29.29', 'server=https://223.5.5.5/dns-query', 'server=https://1.12.12.12/dns-query', '', '[server_local]'];
+  const 行列表538 = ['[general]', 'network_check_url=http://www.gstatic.com/generate_204', 'server_check_url=http://www.gstatic.com/generate_204', 'profile_img_url=https://fastly.jsdelivr.net/gh/byJoey/cfnew@main/snippets/logo.png', 'dns_exclusion_list=*.cmpassport.com, *.jegotrip.com.cn, *.icloud.com, *.icloud.com.cn, *.apple.com, *.weibo.com, *.qq.com', 'running_mode_trigger=filter', '', '[dns]', `server=${(自定义域名系统 || '1.1.1.1').replace(/^https?:\/\//, '').replace(/\/.*$/, '')}`, 'server=8.8.8.8', 'server=https://cloudflare-dns.com/dns-query', 'server=https://dns.google/dns-query', '', '[server_local]'];
   for (const 数量值537 of 节点列表) {
     if (数量值537.proto === 解码64('dmxlc3M=')) {
       const 部分列表536 = [`${数量值537.server}:${数量值537.port}`, `method=none`, `password=${数量值537.uuid}`, `obfs=${数量值537.tls ? 'wss' : 'ws'}`, `obfs-host=${数量值537.host}`, `obfs-uri=${数量值537.path}`];
@@ -1024,7 +1024,7 @@ async function 生成家宽链式值(链接列表) {
   const 加密前置 = 全部前置.filter(项 => 项.tls);
   const 前置节点 = 加密前置.length ? 加密前置 : 全部前置;
   const 前置名称 = 前置节点.map(项 => 项.name);
-  const 域名系统 = 自定义域名系统 || 'https://223.5.5.5/dns-query';
+  const 域名系统 = 自定义域名系统 || 'https://1.1.1.1/dns-query';
   const { 节点列表, 证书 } = await 获取家宽节点();
   const 国家计数 = {};
   const 家宽项 = 节点列表.map(节点 => {
@@ -1128,7 +1128,7 @@ async function 处理订阅请求(请求507, 用户506, 网址505 = null) {
   // 如果启用了ECH，使用自定义值
   let 加密客户端问候配置501 = null;
   if (启用加密客户端问候) {
-    const 域名系统值500 = 自定义域名系统 || 'https://223.5.5.5/dns-query';
+    const 域名系统值500 = 自定义域名系统 || 'https://1.1.1.1/dns-query';
     const 加密客户端问候域名499 = 自定义加密客户端问候域名 || 'cloudflare-ech.com';
     加密客户端问候配置501 = `${加密客户端问候域名499}+${域名系统值500}`;
   }
@@ -1401,7 +1401,7 @@ function 生成链接列表来源源(列表482, 用户481, 工作器域名480, �
 
         // 如果启用了ECH，添加ech参数（ECH需要伪装成Chrome浏览器）
         if (启用加密客户端问候) {
-          const 域名系统值458 = 自定义域名系统 || 'https://223.5.5.5/dns-query';
+          const 域名系统值458 = 自定义域名系统 || 'https://1.1.1.1/dns-query';
           const 加密客户端问候域名457 = 自定义加密客户端问候域名 || 'cloudflare-ech.com';
           网页套接字参数459.set('ech', `${加密客户端问候域名457}+${域名系统值458}`);
         }
@@ -1485,7 +1485,7 @@ async function 生成木马链接列表来源源(列表455, 用户454, 工作器
 
         // 如果启用了ECH，添加ech参数（ECH需要伪装成Chrome浏览器）
         if (启用加密客户端问候) {
-          const 域名系统值435 = 自定义域名系统 || 'https://223.5.5.5/dns-query';
+          const 域名系统值435 = 自定义域名系统 || 'https://1.1.1.1/dns-query';
           const 加密客户端问候域名434 = 自定义加密客户端问候域名 || 'cloudflare-ech.com';
           网页套接字参数436.set('ech', `${加密客户端问候域名434}+${域名系统值435}`);
         }
@@ -1504,57 +1504,10 @@ async function 生成木马链接列表来源源(列表455, 用户454, 工作器
   return 链接列表447;
 }
 
-async function 计算值摘要(文本434) { return createHash('md5').update(文本434).digest('hex'); }
-
+// 本 fork 已移除 api.uouin.com：该接口用共享 key 拉取第三方优选 IP 列表。
+// 优选 IP 请填 yxURL（自托管列表）或在配置里填 yx 自定义列表；
+// 未填时本函数返回空列表，调用方按原有逻辑继续（不再外调 uouin）。
 async function 获取值地址列表() {
-  const 分组线路映射 = {
-    ctcc: '电信',
-    cucc: '联通',
-    cmcc: '移动',
-    bgp: '多线',
-    ipv6: 'IPv6'
-  };
-  const 值4已启用 = 获取配置值('ipv4', '') === '' || 获取配置值('ipv4', 'yes') !== 'no';
-  const 值6已启用 = 获取配置值('ipv6', '') === '' || 获取配置值('ipv6', 'yes') !== 'no';
-  const 值值432 = 获取配置值('ispMobile', '') === '' || 获取配置值('ispMobile', 'yes') !== 'no';
-  const 值值431 = 获取配置值('ispUnicom', '') === '' || 获取配置值('ispUnicom', 'yes') !== 'no';
-  const 值值430 = 获取配置值('ispTelecom', '') === '' || 获取配置值('ispTelecom', 'yes') !== 'no';
-  try {
-    const 时间戳434 = String(Date.now());
-    const 内层摘要434 = await 计算值摘要(解码64('RGRsVHh0TjBzVU91'));
-    const 请求密钥434 = await 计算值摘要(内层摘要434 + 解码64('NzBjbG91ZGZsYXJlYXBpa2V5') + 时间戳434);
-    const 响应434 = await fetch(`${解码64('aHR0cHM6Ly9hcGkudW91aW4uY29tL2luZGV4LnBocC9pbmRleC9DbG91ZGZsYXJl')}?key=${请求密钥434}&time=${时间戳434}`, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0'
-      }
-    });
-    if (!响应434.ok) return [];
-    const 数据434 = await 响应434.json();
-    const 分组集合434 = 数据434 && 数据434.data;
-    if (!分组集合434) return [];
-    const 结果列表433 = [];
-    for (const 分组名434 of Object.keys(分组线路映射)) {
-      const 是否值6434 = 分组名434 === 'ipv6';
-      if (是否值6434 && !值6已启用) continue;
-      if (!是否值6434 && !值4已启用) continue;
-      const 线路名434 = 分组线路映射[分组名434];
-      if (线路名434 === '移动' && !值值432) continue;
-      if (线路名434 === '联通' && !值值431) continue;
-      if (线路名434 === '电信' && !值值430) continue;
-      const 分组434 = 分组集合434[分组名434];
-      const 条目列表434 = 分组434 && Array.isArray(分组434.info) ? 分组434.info : [];
-      for (const 条目434 of 条目列表434) {
-        const 地址434 = 规范化节点主机(条目434 && 条目434.ip);
-        if (!地址434) continue;
-        结果列表433.push({
-          isp: 线路名434,
-          ip: 地址434,
-          colo: ''
-        });
-      }
-    }
-    return 结果列表433;
-  } catch (事件值427) {}
   return [];
 }
 
@@ -1721,7 +1674,7 @@ async function 处理订阅值(请求241, 用户240 = null) {
       enableECH: '启用 ECH (Encrypted Client Hello)',
       enableECHHint: 解码64('5ZCv55So5ZCO77yM5q+P5qyh5Yi35paw6K6i6ZiF5pe25Lya6Ieq5Yqo5LuOIERvSCDojrflj5bmnIDmlrDnmoQgRUNIIOmFjee9ruW5tua3u+WKoOWIsOmTvuaOpeS4rQ=='),
       customDNS: '自定义 DNS 服务器',
-      customDNSPlaceholder: '例如: https://223.5.5.5/dns-query',
+      customDNSPlaceholder: '例如: https://1.1.1.1/dns-query',
       customDNSHint: '用于ECH配置查询的DNS服务器地址（DoH格式）',
       customECHDomain: '自定义 ECH 域名',
       customECHDomainPlaceholder: '例如: cloudflare-ech.com',
@@ -1730,7 +1683,7 @@ async function 处理订阅值(请求241, 用户240 = null) {
       alpnDefault: '默认（留空，由客户端协商）',
       alpnHint: '仅添加到 TLS 节点链接参数；留空则不写 alpn。',
       saveProtocol: 解码64('5L+d5a2Y5Y2P6K6u6YWN572u'),
-      subscriptionConverterPlaceholder: '默认: https://url.v1.mk/sub',
+      subscriptionConverterPlaceholder: '默认: 未设置（订阅转换已禁用）',
       subscriptionConverterHint: 解码64('6K6i6ZiF6L2s5o2i5bey5YaF6YOo5a6e546w77yM5peg6ZyA5aSW6YOoIEFQSeOAguatpOmhueS7heS9nOWFvOWuueS/neeVme+8jOWPr+eVmeepuuOAgg=='),
       builtinPreferredHint: 解码64('5o6n5Yi26K6i6ZiF5Lit5YyF5ZCr5ZOq5Lqb5YaF572u5LyY6YCJ6IqC54K544CC6buY6K6k5YWo6YOo5ZCv55So44CC'),
       apiEnabledDefault: '默认（关闭API）',
@@ -1818,7 +1771,7 @@ async function 处理订阅值(请求241, 用户240 = null) {
       enableECH: 'فعال‌سازی ECH (Encrypted Client Hello)',
       enableECHHint: 'پس از فعال‌سازی، در هر بار تازه‌سازی اشتراک، پیکربندی ECH به‌روز به‌طور خودکار از DoH دریافت شده و به لینک‌ها اضافه می‌شود',
       customDNS: 'سرور DNS سفارشی',
-      customDNSPlaceholder: 'مثال: https://223.5.5.5/dns-query',
+      customDNSPlaceholder: 'مثال: https://1.1.1.1/dns-query',
       customDNSHint: 'آدرس سرور DNS برای جستجوی پیکربندی ECH (فرمت DoH)',
       customECHDomain: 'دامنه ECH سفارشی',
       customECHDomainPlaceholder: 'مثال: cloudflare-ech.com',
@@ -1887,7 +1840,7 @@ async function 处理订阅值(请求241, 用户240 = null) {
       alpnDefault: 'پیش‌فرض (خالی، مذاکره توسط کلاینت)',
       alpnHint: 'فقط به لینک‌های TLS اضافه می‌شود؛ اگر خالی باشد alpn نوشته نمی‌شود.',
       saveProtocol: 'ذخیره تنظیمات پروتکل',
-      subscriptionConverterPlaceholder: 'پیش‌فرض: https://url.v1.mk/sub',
+      subscriptionConverterPlaceholder: 'پیش‌فرض: تنظیم نشده است',
       subscriptionConverterHint: 'تبدیل اشتراک به صورت داخلی پیاده‌سازی شده است و نیازی به API خارجی ندارد. این فیلد فقط برای سازگاری حفظ شده و می‌توان آن را خالی گذاشت.',
       builtinPreferredHint: 'کنترل اینکه کدام گره‌های ترجیحی داخلی در اشتراک گنجانده شوند. به طور پیش‌فرض همه فعال هستند.',
       apiEnabledDefault: 'پیش‌فرض (بستن API)',
@@ -4492,7 +4445,7 @@ function 生成链接列表来源新地址列表(列表100, 用户99, 工作器�
 
       // 如果启用了ECH，添加ech参数（ECH需要伪装成Chrome浏览器）
       if (启用加密客户端问候) {
-        const 域名系统值84 = 自定义域名系统 || 'https://223.5.5.5/dns-query';
+        const 域名系统值84 = 自定义域名系统 || 'https://1.1.1.1/dns-query';
         const 加密客户端问候域名83 = 自定义加密客户端问候域名 || 'cloudflare-ech.com';
         链接85 += `&ech=${encodeURIComponent(`${加密客户端问候域名83}+${域名系统值84}`)}`;
       }
@@ -4511,7 +4464,7 @@ function 生成链接列表来源新地址列表(列表100, 用户99, 工作器�
 
       // 如果启用了ECH，添加ech参数（ECH需要伪装成Chrome浏览器）
       if (启用加密客户端问候) {
-        const 域名系统值78 = 自定义域名系统 || 'https://223.5.5.5/dns-query';
+        const 域名系统值78 = 自定义域名系统 || 'https://1.1.1.1/dns-query';
         const 加密客户端问候域名77 = 自定义加密客户端问候域名 || 'cloudflare-ech.com';
         链接79 += `&ech=${encodeURIComponent(`${加密客户端问候域名77}+${域名系统值78}`)}`;
       }
@@ -4551,7 +4504,7 @@ function 生成扩展超文本链接列表来源源(列表76, 用户75, 工作�
     // 单流双向传输需要 HTTP/2，不能跟随其他协议的仅 HTTP/1.1 选项。
     参数.set('alpn', 'h2');
     if (启用加密客户端问候) {
-      const 域名系统值64 = 自定义域名系统 || 'https://223.5.5.5/dns-query';
+      const 域名系统值64 = 自定义域名系统 || 'https://1.1.1.1/dns-query';
       const 加密客户端问候域名63 = 自定义加密客户端问候域名 || 'cloudflare-ech.com';
       参数.set('ech', `${加密客户端问候域名63}+${域名系统值64}`);
     }
@@ -4577,7 +4530,7 @@ async function 生成木马链接列表来源新地址列表(列表, 用户, 工
 
       // 如果启用了ECH，添加ech参数（ECH需要伪装成Chrome浏览器）
       if (启用加密客户端问候) {
-        const 域名系统值58 = 自定义域名系统 || 'https://223.5.5.5/dns-query';
+        const 域名系统值58 = 自定义域名系统 || 'https://1.1.1.1/dns-query';
         const 加密客户端问候域名57 = 自定义加密客户端问候域名 || 'cloudflare-ech.com';
         链接59 += `&ech=${encodeURIComponent(`${加密客户端问候域名57}+${域名系统值58}`)}`;
       }
@@ -4596,7 +4549,7 @@ async function 生成木马链接列表来源新地址列表(列表, 用户, 工
 
       // 如果启用了ECH，添加ech参数（ECH需要伪装成Chrome浏览器）
       if (启用加密客户端问候) {
-        const 域名系统值 = 自定义域名系统 || 'https://223.5.5.5/dns-query';
+        const 域名系统值 = 自定义域名系统 || 'https://1.1.1.1/dns-query';
         const 加密客户端问候域名 = 自定义加密客户端问候域名 || 'cloudflare-ech.com';
         链接 += `&ech=${encodeURIComponent(`${加密客户端问候域名}+${域名系统值}`)}`;
       }

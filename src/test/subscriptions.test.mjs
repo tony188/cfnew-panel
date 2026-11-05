@@ -65,7 +65,7 @@ test('空节点配置仍可启动，DNS地址错误有明确反馈', async () =>
   assert.ok(empty.outbounds.every(node => node.type !== 'urltest'));
   assert.throws(() => buildSingboxConfig([], { dns: 'ftp://example.com' }), /DNS地址格式无效/);
   assert.equal(buildSingboxConfig([], { dns: '8.8.8.8' }).dns.servers[1].type, 'tcp');
-  assert.equal(buildSingboxConfig([], { dns: 'h3://223.5.5.5/dns-query' }).dns.servers[1].type, 'https');
+  assert.equal(buildSingboxConfig([], { dns: 'h3://1.1.1.1/dns-query' }).dns.servers[1].type, 'https');
   assert.equal(buildSingboxConfig([], { dns: '2001:4860:4860::8888' }).dns.servers[1].server, '2001:4860:4860::8888');
   assert.equal(buildSingboxConfig([], { dns: 'https://resolver.example/dns-query?mode=normal' }).dns.servers[1].path, '/dns-query?mode=normal');
   assert.throws(() => buildSingboxConfig([], { dns: 'quic://example.com' }), /不能转发QUIC DNS/);
@@ -73,7 +73,9 @@ test('空节点配置仍可启动，DNS地址错误有明确反馈', async () =>
 
 test('其它客户端生成结果保持原样', async () => {
   // 固定重写前的真实输出，保护其它客户端。
-  const hashes = {"base64": "d3d5937fc19aba4cac7687915009441bae2830cc1292da198d1e7546ebaaad04", "v2ray": "d3d5937fc19aba4cac7687915009441bae2830cc1292da198d1e7546ebaaad04", "surge": "fbc1b103318b743145db4c446ece58ea5baaec8ef4a08bdb444c07e3e2697533", "loon": "12164d4e0bcead8288b5a7b898316d7277ce0bc919b687a26ddabbacfb799070", "quanx": "e336fe3da03494264cf3d3794b91732cd33d0809516265a459c7b8e734f1eb3b"};
+  // 2026-11-05 DNS 替换后重定基线：新旧输出逐行 diff 证实差异仅为 DNS 行
+  //（Surge/Loon/Quanx/Clash 的 DNS 服务器与 DoH 地址，sing-box 的 remote DNS），其余内容不变。
+  const hashes = {"base64": "d3d5937fc19aba4cac7687915009441bae2830cc1292da198d1e7546ebaaad04", "v2ray": "d3d5937fc19aba4cac7687915009441bae2830cc1292da198d1e7546ebaaad04", "surge": "199418433606d927055383487ffe69cf81dff8b9ab3f2e69ea502b80ac4d2df3", "loon": "2b0e0a68123cde834f5f27f3255b94124b37878993a7a28fd60becb49a3b41f2", "quanx": "f130bbdd3bf70202914854771f7142cef04cc60d336f45598f12441f91bb4baf"};
   for (const [target, expected] of Object.entries(hashes)) {
     assert.equal(createHash("sha256").update(await subscription(target)).digest("hex"), expected, target);
   }
