@@ -53,7 +53,10 @@ test('面板对照当前、旧版、无版本内核，并提供真实更新说�
       assert.equal(context.release.changes.length, 2);
       assert.ok(context.release.changes.some(text => text.includes('CPU')));
       assert.ok(context.release.changes.some(text => text.includes('配套内核')));
-      assert.equal(context.release.zipUrl, 'https://raw.githubusercontent.com/byJoey/cfnew/core-only/pages.zip');
+      assert.equal(context.release.zipUrl, undefined);
+      assert.equal(context.release.workerUrl, 'https://raw.githubusercontent.com/tony188/cfnew-panel/main/worker/_worker.js');
+      assert.equal(context.release.repoUrl, 'https://github.com/tony188/cfnew-panel/tree/main/worker');
+      assert.ok(!JSON.stringify(context.release).includes('byJoey'), '更新说明不得再指向 byJoey');
     } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }
   }
 });

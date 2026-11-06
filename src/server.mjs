@@ -393,7 +393,7 @@ export async function handlePanel(request) {
     if (!legacy && [403, 404].includes(error.upstreamStatus)) return new Response('Not Found', { status: 404 });
     if (error.status === 401) return new Response('管理会话已过期或无效，请刷新页面重新登录', { status: 401, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
     const message = String(error.message).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('"', '&quot;');
-    return new Response('<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>连接未完成</title>' + theme + '<body class="landing"><main><div class="brand">CFNEW</div><h1>连接未完成</h1><p>' + message + '</p><a href="/">返回重新填写</a></main></body></html>', { status: error.status || 400, headers: { 'Content-Type': 'text/html; charset=utf-8' } });
+    return new Response('<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>连接未完成</title>' + theme + '<body class="landing"><main><div class="brand">CFnew</div><h1>连接未完成</h1><p>' + message + '</p><a href="/">返回重新填写</a></main></body></html>', { status: error.status || 400, headers: { 'Content-Type': 'text/html; charset=utf-8' } });
   }
 }
 
@@ -434,5 +434,5 @@ export function createPanelServer() {
 if (!process.env.VERCEL && process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const port = Number(process.env.PORT || 3100);
   const host = process.env.HOST || '127.0.0.1';
-  createPanelServer().listen(port, host, () => console.log('CFnew 独立面板已启动，端口 ' + port));
+  createPanelServer().listen(port, host, () => console.log('CFnew 面板已启动，端口 ' + port));
 }

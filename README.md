@@ -6,8 +6,6 @@
 
 把 CFnew 控制台、优选操作和订阅生成放在 Vercel，Cloudflare Worker 只负责代理转发和 KV 配置。节点流量直接连接你自己的 Worker，不经过面板。
 
-图文教程：[CFnew 独立面板：Vercel 一键部署](https://joeyblog.net/cfnew-panel-vercel-deploy.html)。
-
 ## 一键部署
 
 **首选脚本路**：仓内 `scripts/deploy-one-click.sh`，一次配好 token 后一条命令部署 Worker + 面板（见脚本头用法）。Worker 源码已 vendor 在仓内 `worker/`（`_worker.js` + `wrangler.toml`），脚本自动部署，不用再去上游拉 core-only。
@@ -45,9 +43,11 @@ GitHub 中已经有自己的 `cfnew-panel` 仓库时，在 Vercel 的 New Projec
 
 ```text
 控制台：https://面板域名/你的UUID
-订阅：  https://面板域名/你的UUID/sub
-Clash： https://面板域名/你的UUID/sub?target=clash
+订阅：  https://面板域名/sub/<订阅令牌>
+Clash： https://面板域名/sub/<订阅令牌>?target=clash
 ```
+
+家宽链式（`target=vg`）订阅仍可手工拼 URL 生成：`https://面板域名/sub/<订阅令牌>?target=vg`（`jk` 须为 `yes`），管理页不再提供入口。
 
 如果 Worker 的 `d` 是 `/Admin/Panel`，也可用 `https://面板域名/Admin/Panel` 进入。大小写必须一致。登录后地址自动使用稳定的 UUID，后续修改 `d` 不影响当前面板重载和已复制订阅。`d` 是配置入口，`tp` 是代理传输设置。
 
@@ -57,34 +57,12 @@ Clash： https://面板域名/你的UUID/sub?target=clash
 
 浏览器登录 Vercel 后能打开面板，不代表客户端能更新订阅。用实际对外域名验证，不能给订阅链接附上 Vercel 账号令牌。
 
-## 公共模式
-
-首页填写域名和 UUID 即可。也可使用：
-
-```text
-控制台：/panel?host=your-worker.example.com&uuid=你的UUID
-订阅：  /sub?host=your-worker.example.com&uuid=你的UUID
-Clash： /sub?host=your-worker.example.com&uuid=你的UUID&target=clash
-```
-
-支持 `base64`、`v2ray`、`clash`、`stash`、`singbox`、`surge`、`loon`、`quanx`；开启家宽链式后可使用 `target=vg`。不指定时按客户端请求头识别。
-
-未绑定 Worker KV 仍可读取环境配置并生成订阅，但页面不能保存。原来直接指向 Worker 的 `/sub` 需替换成独立面板生成的新订阅。
-
-## Free CPU 保护
-
-更新配套内核到 `2026.10.17.2`，在“配置管理”开启 **Free CPU 保护**，保存后对新连接生效。默认关闭，旧内核会提示更新。
-
-开启后保留 WS 和 XHTTP：每条连接上下载合计最多 **384 KiB 或 96 个数据块**，超过就主动断开。新连接重新计算预算；关闭后恢复原来的传输方式。没有 KV 时可设置 Worker 变量 `freeCpu=yes` 或 `FREE_CPU=yes`，KV 中的设置优先。
-
-这是按流量和处理次数估算的保护，Worker 无法读取实时 CPU 余量，不能保证所有免费账号零超限。客户端需自行重连，正在进行的下载、视频和长连接可能中断，不会自动续传。
-
 ## 自有服务器与 Docker
 
 Node.js 22：
 
 ```bash
-git clone https://github.com/byJoey/cfnew-panel.git
+git clone https://github.com/tony188/cfnew-panel.git
 cd cfnew-panel
 npm start
 # 可选：固定自己的 Worker
@@ -104,9 +82,9 @@ docker compose up -d --build
 
 ## 更新与限制
 
-- 一键部署得到自己的仓库副本。更新面板源码需同步上游并重新部署；修改环境变量也要重新部署。
+- 一键部署得到自己的仓库副本。更新面板源码后重新部署；修改环境变量也要重新部署。
 - 原 WebSocket、XHTTP、出站代理、ECH、IPv6 与客户端订阅生成保留；代理数据面仍由配套核心处理。
-- 在线 IP 检测在面板服务器执行，延迟是服务器视角。Vercel 实测 IPv4 检测可用，IPv6 在线检测出现平台出站错误；IPv6 节点生成和 Worker 实际连接已验证，不能用在线检测结果代替客户端测速。
+- 在线 IP 检测探测接口仍在，延迟是服务器视角；管理页不再提供延迟测试入口。IPv6 节点生成和 Worker 实际连接已验证，不能用服务器视角的检测结果代替客户端测速。
 - sing-box 使用 1.12 起的 DNS / 路由格式，内置分流规则，不要求启动时下载规则文件。规则许可见 [NOTICE](./NOTICE.md) 和 `/rules-license`。
 - 请求正文上限 1 MiB，大量地址可改用在线列表 URL。健康检查为 `/health`。
 - GitHub Pages 只能托管静态页面，不能运行本项目的服务端配置转发、订阅转换和在线检测；本项目使用 Vercel Functions。
@@ -134,6 +112,5 @@ npm run build:vercel -- /一个空目录
 
 本版本采用自定义的 [CFnew 源码使用与署名许可](./LICENSE)，不再标为标准 MIT。此前已按 MIT 发布的版本仍按其原许可使用。来源与第三方许可见 [NOTICE.md](./NOTICE.md)，内置规则数据继续遵循其原始许可。
 
-[博客](https://joeyblog.net) · [YouTube](https://youtube.com/@joeyblog) · [Telegram](https://t.me/+ft-zI76oovgwNmRh)
 
 本项目供学习与网络技术研究，请遵守当地法律及所用平台的服务条款。

@@ -48,7 +48,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     const downloads = document.createElement('div');
     downloads.className = 'release-downloads';
-    for (const [label, url] of [['下载 pages.zip', release.zipUrl], ['下载 _worker.js', release.workerUrl]]) {
+    for (const [label, url] of [['下载 _worker.js', release.workerUrl], ['去仓库取 core 文件', release.repoUrl]]) {
       const link = document.createElement('a');
       link.textContent = label; link.href = url; link.target = '_blank'; link.rel = 'noopener noreferrer';
       downloads.append(link);

@@ -49,13 +49,11 @@ test('不同Worker的保护设置不会串用，开关不改变客户端订阅',
   assert.equal(await subscribe('yes'), await subscribe('no'));
 });
 
-test('新内核可操作开关，旧内核禁用并提示更新，页面脚本有效', async () => {
+test('管理页不再提供 Free CPU 开关，但 core 侧 freeCpu 键行为不变，页面脚本有效', async () => {
   for (const config of [{ freeCpu: 'yes' }, {}]) {
     const html = await (await createSubscriptionEngine(config, uuid).render(new Request('https://worker.example/' + uuid))).text();
-    const input = html.match(/<input[^>]*id="freeCpu"[^>]*>/)[0];
-    assert.equal(input.includes('disabled'), !Object.hasOwn(config, 'freeCpu'));
-    assert.ok(html.includes('aria-describedby="freeCpuHint"'));
-    if (!Object.hasOwn(config, 'freeCpu')) assert.ok(html.includes('当前内核不支持'));
+    assert.ok(!html.includes('id="freeCpu"'), '管理页不应再有 freeCpu 开关');
+    assert.ok(!html.includes('freeCpuHint'), '管理页不应再有 freeCpu 说明');
     for (const [, script] of html.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g)) new Function(script);
   }
 });

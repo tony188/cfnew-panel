@@ -20,11 +20,13 @@ const table = new Map([...tableSrc[1].matchAll(/(\w+):\s*'([^']+)'/g)].map(m => 
 
 // 2026-11-06 线上实测 bug 曾错映射的 10 个键：9 个开关 + s。
 // 旧值是 ev→evEnable、et→etEnable、ex→exEnable、ech→echEnable、ena→enaEnable、
-// jk→jkEnable、epd→epdEnable、epi→epiEnable、egi→egiEnable、s→s（表单上都不存在）。
-const fixedMappings = { ena: 'ena', jk: 'jk', epd: 'epd', epi: 'epi', egi: 'egi', ev: 'ev', et: 'et', ex: 'ex', ech: 'ech', s: 'socksConfig' };
+// epd→epdEnable、egi→egiEnable、s→s（表单上都不存在）。
+// ⑤ 删字段后 jk/epi 已不在对应表里（jk→jkEnable、epi→epiEnable 的旧错映射随之消失），
+// 余 8 个键仍须映射到真实 id。
+const fixedMappings = { ena: 'ena', epd: 'epd', egi: 'egi', ev: 'ev', et: 'et', ex: 'ex', ech: 'ech', s: 'socksConfig' };
 
 test('元素对应表里的全部 id 在渲染出的管理页里存在', () => {
-  assert.equal(table.size, 32, '对应表应有 32 个键，实际 ' + table.size);
+  assert.equal(table.size, 23, '对应表应有 23 个键，实际 ' + table.size);
   for (const [key, id] of Object.entries(fixedMappings)) {
     assert.equal(table.get(key), id, key + ' 应映射到真实 id ' + id + '，实际 ' + table.get(key));
   }
@@ -55,12 +57,12 @@ test('取消 ech 勾选能产生含 ech 的差异（线上 bug 回归）', () =>
   assert.equal(ech.新值, 'no');
 });
 
-test('开关类改动都能产生差异：ev/et/ex/ena/jk/epd/epi/egi/s', () => {
-  const loaded = { ...fixture, ev: 'yes', et: 'no', ex: 'no', ena: 'yes', jk: 'no', epd: 'yes', epi: 'yes', egi: 'yes', s: '' };
-  const next = { ...loaded, ev: 'no', et: 'yes', ex: 'yes', ena: 'no', jk: 'yes', epd: 'no', epi: 'no', egi: 'no', s: 'http://proxy.example:8080' };
+test('开关类改动都能产生差异：ev/et/ex/ena/epd/egi/s', () => {
+  const loaded = { ...fixture, ev: 'yes', et: 'no', ex: 'no', ena: 'yes', epd: 'yes', egi: 'yes', s: '' };
+  const next = { ...loaded, ev: 'no', et: 'yes', ex: 'yes', ena: 'no', epd: 'no', egi: 'no', s: 'http://proxy.example:8080' };
   const diff = makeCalcDiff(loaded)(next, 'yes', false);
   const keys = diff.map(d => d.key);
-  for (const key of ['ev', 'et', 'ex', 'ena', 'jk', 'epd', 'epi', 'egi', 's']) {
+  for (const key of ['ev', 'et', 'ex', 'ena', 'epd', 'egi', 's']) {
     assert.ok(keys.includes(key), key + ' 改动后应产生差异，实际差异键：' + JSON.stringify(keys));
   }
 });

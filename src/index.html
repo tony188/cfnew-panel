@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="referrer" content="no-referrer">
-<title>CFnew 独立面板</title>
+<title>CFnew</title>
 </head>
 <body class="landing">
 <main>
@@ -20,6 +20,7 @@
     <label for="uuid">UUID 或自定义路径</label>
     <input type="text" id="uuid" name="uuid" placeholder="填写 UUID，或 d 设置的路径" required autocomplete="off" spellcheck="false">
     <label class="remember"><input id="remember" type="checkbox">在这台设备记住节点</label>
+    <small>只保存在这台浏览器；换电脑或清除浏览器数据后即失效，Worker 配置不受影响。</small>
     <div id="historyControls" class="history-row" hidden>
       <select id="history" aria-label="已保存的节点"></select>
       <button type="button" id="deleteNode" disabled>删除所选</button>

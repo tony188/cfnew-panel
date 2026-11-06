@@ -75,7 +75,9 @@ test('其它客户端生成结果保持原样', async () => {
   // 固定重写前的真实输出，保护其它客户端。
   // 2026-11-05 DNS 替换后重定基线：新旧输出逐行 diff 证实差异仅为 DNS 行
   //（Surge/Loon/Quanx/Clash 的 DNS 服务器与 DoH 地址，sing-box 的 remote DNS），其余内容不变。
-  const hashes = {"base64": "d3d5937fc19aba4cac7687915009441bae2830cc1292da198d1e7546ebaaad04", "v2ray": "d3d5937fc19aba4cac7687915009441bae2830cc1292da198d1e7546ebaaad04", "surge": "199418433606d927055383487ffe69cf81dff8b9ab3f2e69ea502b80ac4d2df3", "loon": "2b0e0a68123cde834f5f27f3255b94124b37878993a7a28fd60becb49a3b41f2", "quanx": "f130bbdd3bf70202914854771f7142cef04cc60d336f45598f12441f91bb4baf"};
+  // 2026-11-06 ⑤ 去上游化删 QX profile_img_url 行后重定基线：quanx 哈希随之变，
+  // 其余 4 个哈希不动（改后真实输出重算，非放宽断言）。
+  const hashes = {"base64": "d3d5937fc19aba4cac7687915009441bae2830cc1292da198d1e7546ebaaad04", "v2ray": "d3d5937fc19aba4cac7687915009441bae2830cc1292da198d1e7546ebaaad04", "surge": "199418433606d927055383487ffe69cf81dff8b9ab3f2e69ea502b80ac4d2df3", "loon": "2b0e0a68123cde834f5f27f3255b94124b37878993a7a28fd60becb49a3b41f2", "quanx": "33dbf88875eb99bdef11e0635d335846e9012f13175303e88e913915d42dfa05"};
   for (const [target, expected] of Object.entries(hashes)) {
     assert.equal(createHash("sha256").update(await subscription(target)).digest("hex"), expected, target);
   }

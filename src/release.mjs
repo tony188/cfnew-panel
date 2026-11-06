@@ -7,10 +7,10 @@ export function coreRelease(config) {
     coreVersion,
     needsUpdate: coreVersion !== PANEL_VERSION,
     changes: [
-      '新增 Free CPU 保护开关，按单连接双向流量和数据块预算提前断开。',
-      '默认关闭；开启后可能中断下载和视频，需客户端重连。更新配套内核后生效。',
+      'Free CPU 保护保留在内核里，管理页不再提供开关；默认关闭。',
+      '需要改限额时直接改 KV 或 Worker 变量，更新配套内核后生效。',
     ],
-    zipUrl: 'https://raw.githubusercontent.com/byJoey/cfnew/core-only/pages.zip',
-    workerUrl: 'https://raw.githubusercontent.com/byJoey/cfnew/core-only/_worker.js',
+    workerUrl: 'https://raw.githubusercontent.com/tony188/cfnew-panel/main/worker/_worker.js',
+    repoUrl: 'https://github.com/tony188/cfnew-panel/tree/main/worker',
   };
 }
