@@ -1,5 +1,6 @@
 import { createServer as createHttpServer, request as httpRequest } from 'node:http';
 import { request as httpsRequest } from 'node:https';
+import { createHash } from 'node:crypto';
 import { lookup } from 'node:dns/promises';
 import { isIP } from 'node:net';
 import { readFile } from 'node:fs/promises';
@@ -129,6 +130,41 @@ export function normalizeAccess(value) {
 
 const workerAddresses = new Map();
 const recentConfig = new Map();
+
+// Phase 1 ②：/sub 服务端缓存（进程内、单实例有效；Vercel 多实例不共享，见报告）。
+// 缓存键 = Worker 地址 + 配置版本（① 产出）+ target + UA 归类 + 订阅令牌作用域（③ 产出，
+// 令牌只存 SHA-256 截断哈希，不存明文）。
+// TTL 120 秒（冻结定数，测试可用 CFNEW_SUB_TTL_MS 覆盖，默认 120000）；
+// 配置一改（版本 +1）键即变，旧项自然失效，不只靠 TTL。
+// 只缓存 200 响应；失败生成不进缓存；在途同键请求共享一次生成。
+// 客户端侧仍强制 Cache-Control: no-store（见 createPanelServer 与 Vercel 入口，订阅内容含
+// 节点凭证，不得进共享/代理缓存）；服务端缓存与客户端缓存是两回事。
+// X-CFNEW-SUB-CACHE: HIT/MISS 仅供观测与测试，不影响缓存语义。
+const subCacheMaxEntries = 64;
+const subCache = new Map(); // key -> { status, headers, body, expires }
+const subPending = new Map(); // key -> Promise<{ status, headers, body }>
+
+function subCacheTtlMs() {
+  const value = Number(process.env.CFNEW_SUB_TTL_MS || 120000);
+  return Number.isFinite(value) && value > 0 ? value : 120000;
+}
+
+function subCacheKey({ workerBase, configVersion, target, agentClass, token }) {
+  const scope = createHash('sha256').update(String(token)).digest('hex').slice(0, 16);
+  return ['v1', workerBase, configVersion, target, agentClass, scope].join('|');
+}
+
+function subCacheGet(key) {
+  const entry = subCache.get(key);
+  if (!entry) return null;
+  if (entry.expires <= Date.now()) { subCache.delete(key); return null; }
+  return entry;
+}
+
+function subCacheSet(key, entry) {
+  if (subCache.size >= subCacheMaxEntries) subCache.delete(subCache.keys().next().value);
+  subCache.set(key, entry);
+}
 
 async function requestWorkerUrl(workerBase, url, method = 'GET', body = undefined, extraHeaders = {}) {
   workerBase = selectWorker(workerBase);
@@ -274,12 +310,45 @@ export async function handlePanel(request) {
   if (subTokenMatch) {
     try {
       const workerBase = selectWorker(url.searchParams.get('host'));
+      // 每请求仍先调 Worker 验令牌并取当前配置版本（便宜的配置读取，见 core 30 秒
+      // KV 内存缓存）；贵的是下面的订阅生成，只生成一次的部分才走缓存。
       const config = await loadSubConfig(workerBase, subTokenMatch[1]);
       const uuid = config.uuid;
-      const engine = createSubscriptionEngine(config, uuid);
-      const workerUrl = new URL(workerBase + '/' + uuid + '/sub');
-      workerUrl.searchParams.set('target', url.searchParams.get('target') || targetForAgent(request.headers.get('User-Agent')));
-      return await engine.subscribe(new Request(workerUrl, { headers: request.headers }));
+      const target = url.searchParams.get('target') || targetForAgent(request.headers.get('User-Agent'));
+      const agentClass = targetForAgent(request.headers.get('User-Agent'));
+      const configVersion = typeof config.configVersion === 'number' ? config.configVersion : 0;
+      const key = subCacheKey({ workerBase, configVersion, target, agentClass, token: subTokenMatch[1] });
+      const hit = subCacheGet(key);
+      if (hit) {
+        const headers = new Headers(hit.headers);
+        headers.set('X-CFNEW-SUB-CACHE', 'HIT');
+        return new Response(hit.body, { status: hit.status, headers });
+      }
+      let pending = subPending.get(key);
+      if (!pending) {
+        pending = (async () => {
+          const engine = createSubscriptionEngine(config, uuid);
+          const workerUrl = new URL(workerBase + '/' + uuid + '/sub');
+          workerUrl.searchParams.set('target', target);
+          const generated = await engine.subscribe(new Request(workerUrl, { headers: request.headers }));
+          const headers = {};
+          for (const [name, value] of generated.headers) headers[name] = value;
+          return { status: generated.status, headers, body: await generated.text() };
+        })();
+        subPending.set(key, pending);
+        // 失败不污染缓存：非 200 不写缓存；抛错同样不写；无论如何清掉在途记录。
+        pending.then(
+          entry => {
+            subPending.delete(key);
+            if (entry.status === 200) subCacheSet(key, { ...entry, expires: Date.now() + subCacheTtlMs() });
+          },
+          () => { subPending.delete(key); },
+        );
+      }
+      const entry = await pending;
+      const headers = new Headers(entry.headers);
+      headers.set('X-CFNEW-SUB-CACHE', 'MISS');
+      return new Response(entry.body, { status: entry.status, headers });
     } catch (error) {
       return new Response('订阅更新失败：' + error.message, { status: error.status || 503 });
     }

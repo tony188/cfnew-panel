@@ -2,6 +2,78 @@
 import { createHash } from 'node:crypto';
 import { isIP } from 'node:net';
 import { buildSingboxConfig, normalizeNodeNames } from './singbox.mjs';
+// Phase 1 ②：yxURL 源 TTL 缓存（按源 URL，冻结定数 1800 秒；进程内、单实例有效）。
+// 同一源在 TTL 内只拉一次；并发同源请求共享一次拉取；失败/空结果不缓存（下次重拉）。
+// 测试可用 CFNEW_YXURL_TTL_MS 覆盖，默认 1800000。
+const 优选源缓存期限 = () => {
+  const 值 = Number(process.env.CFNEW_YXURL_TTL_MS || 1800 * 1000);
+  return Number.isFinite(值) && 值 > 0 ? 值 : 1800 * 1000;
+};
+const 优选源缓存上限 = 128;
+const 优选源缓存 = new Map(); // 网址 -> { expires, 文本 } | { promise }
+
+// 拉取单个 yxURL 源并解码为文本（utf-8 / gb2312 回退，与原 获取优选接口 内联逻辑一致）。
+// 命中缓存直接返回；同源并发共享一次拉取；空/失败结果不写缓存。
+async function 拉取优选源文本(网址, 超时 = 3000) {
+  const 命中 = 优选源缓存.get(网址);
+  if (命中) {
+    if (命中.文本 !== undefined && 命中.expires > Date.now()) return 命中.文本;
+    if (命中.promise) return 命中.promise;
+  }
+  const 待决 = (async () => {
+    let 文本 = '';
+    try {
+      const 控制器 = new AbortController();
+      const 超时标识 = setTimeout(() => 控制器.abort(), 超时);
+      try {
+        const 响应 = await fetch(网址, {
+          signal: 控制器.signal
+        });
+        clearTimeout(超时标识);
+        const 缓冲 = await 响应.arrayBuffer();
+        const 内容类型 = (响应.headers.get('content-type') || '').toLowerCase();
+        const 字符集 = 内容类型.match(/charset=([^\s;]+)/i)?.[1]?.toLowerCase() || '';
+        let 解码器列表 = ['utf-8', 'gb2312'];
+        if (字符集.includes('gb') || 字符集.includes('gbk') || 字符集.includes('gb2312')) {
+          解码器列表 = ['gb2312', 'utf-8'];
+        }
+        let 解码成功 = false;
+        for (const 解码器 of 解码器列表) {
+          try {
+            const 已解码 = new TextDecoder(解码器).decode(缓冲);
+            if (已解码 && 已解码.length > 0 && !已解码.includes('\ufffd')) {
+              文本 = 已解码;
+              解码成功 = true;
+              break;
+            } else if (已解码 && 已解码.length > 0) {
+              continue;
+            }
+          } catch (事件值16) {
+            continue;
+          }
+        }
+        if (!解码成功) {
+          文本 = await 响应.text();
+        }
+      } catch {
+        clearTimeout(超时标识);
+        文本 = '';
+      }
+    } catch {
+      文本 = '';
+    }
+    if (文本 && 文本.trim().length > 0) {
+      if (优选源缓存.size >= 优选源缓存上限) 优选源缓存.delete(优选源缓存.keys().next().value);
+      优选源缓存.set(网址, { expires: Date.now() + 优选源缓存期限(), 文本 });
+    } else {
+      优选源缓存.delete(网址);
+    }
+    return 文本;
+  })();
+  优选源缓存.set(网址, { promise: 待决 });
+  return 待决;
+}
+
 export function createSubscriptionEngine(config, uuid) {
 const 基础64文本解码器 = new TextDecoder();
 
@@ -4620,9 +4692,10 @@ async function 获取值解析新地址列表() {
       }
       return 结果列表110;
     }
-    const 响应107 = await fetch(网址113);
-    if (!响应107.ok) return [];
-    const 文本106 = await 响应107.text();
+    // Phase 1 ②：复用上面 获取优选接口 已拉取的源文本（1800 秒缓存内），不再对同一源
+    // 二次 fetch。原文按 ip:port#name 逐行解析，解析逻辑不变。
+    const 文本106 = (await Promise.all(网址列表112.map(网址 => 拉取优选源文本(网址, 5000)))).join('\n');
+    if (!文本106.trim()) return [];
     const 结果列表105 = [];
     const 行列表104 = 文本106.trim().replace(/\r/g, "").split('\n');
     const 值正则 = /^([^:]+):(\d+)#(.*)$/;
@@ -4879,43 +4952,8 @@ async function 获取优选接口(网址列表, 默认端口 = '443', 超时 = 3
   const 结果列表 = new Set();
   await Promise.allSettled(网址列表.map(async 网址 => {
     try {
-      const 控制器 = new AbortController();
-      const 超时标识 = setTimeout(() => 控制器.abort(), 超时);
-      const 响应 = await fetch(网址, {
-        signal: 控制器.signal
-      });
-      clearTimeout(超时标识);
-      let 文本 = '';
-      try {
-        const 缓冲 = await 响应.arrayBuffer();
-        const 内容类型 = (响应.headers.get('content-type') || '').toLowerCase();
-        const 字符集 = 内容类型.match(/charset=([^\s;]+)/i)?.[1]?.toLowerCase() || '';
-        let 解码器列表 = ['utf-8', 'gb2312'];
-        if (字符集.includes('gb') || 字符集.includes('gbk') || 字符集.includes('gb2312')) {
-          解码器列表 = ['gb2312', 'utf-8'];
-        }
-        let 解码成功 = false;
-        for (const 解码器 of 解码器列表) {
-          try {
-            const 已解码 = new TextDecoder(解码器).decode(缓冲);
-            if (已解码 && 已解码.length > 0 && !已解码.includes('\ufffd')) {
-              文本 = 已解码;
-              解码成功 = true;
-              break;
-            } else if (已解码 && 已解码.length > 0) {
-              continue;
-            }
-          } catch (事件值16) {
-            continue;
-          }
-        }
-        if (!解码成功) {
-          文本 = await 响应.text();
-        }
-        if (!文本 || 文本.trim().length === 0) {
-          return;
-        }
-      } catch (事件值15) {
+      const 文本 = await 拉取优选源文本(网址, 超时);
+      if (!文本 || 文本.trim().length === 0) {
         return;
       }
       const 行列表 = 文本.trim().split('\n').map(行值14 => 行值14.trim()).filter(行值 => 行值);
