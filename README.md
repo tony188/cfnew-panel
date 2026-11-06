@@ -1,6 +1,6 @@
 # CFnew 独立面板
 
-[![部署到 Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FbyJoey%2Fcfnew-panel&project-name=cfnew-panel&repository-name=cfnew-panel)
+[![部署到 Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Ftony188%2Fcfnew-panel&project-name=cfnew-panel&repository-name=cfnew-panel&env=w&envDescription=Worker%20%E5%9C%B0%E5%9D%80%EF%BC%8C%E5%A6%82%20https%3A%2F%2Fcfnew.%3C%E5%AD%90%E5%9F%9F%E5%90%8D%3E.workers.dev%EF%BC%8C%E9%83%A8%E7%BD%B2%20Worker%20%E5%90%8E%E5%A1%AB%E5%85%A5)
 [![Node.js 22](https://img.shields.io/badge/Node.js-22-43853d)](https://nodejs.org/)
 [![源码许可](https://img.shields.io/badge/源码许可-署名与禁止冒充原创-blue)](./LICENSE)
 
@@ -10,10 +10,16 @@
 
 ## 一键部署
 
-1. 先部署 [CFnew 精简内核](https://github.com/byJoey/cfnew/tree/core-only)，设置 Worker 变量 `u` 为自己的 UUID。需要在线保存配置时，绑定 KV，名称填 `C` 或 `c`。已有用户保留原 UUID 和 KV 绑定，兼容日期用 `2026-01-20`。
-2. 点击上面的 Deploy 按钮，登录 Vercel，按页面提示连接 GitHub 并创建自己的仓库副本。
+**首选脚本路**：仓内 `scripts/deploy-one-click.sh`，一次配好 token 后一条命令部署 Worker + 面板（见脚本头用法）。Worker 源码已 vendor 在仓内 `worker/`（`_worker.js` + `wrangler.toml`），脚本自动部署，不用再去上游拉 core-only。
+
+**按钮路是全新环境备用路，不复用现有项目**：Vercel Deploy Button 的语义是把源码 clone 成你 GitHub 账号下的一个新仓库、再新建一个 Vercel 项目，不会指向已有的 `tony188/cfnew-panel` 项目，也不会复用已有的面板部署。已部署的用户请走脚本路或 Import 现有仓，**不得点按钮**，否则会得到第二个面板、第二个订阅地址，与现状分叉。
+
+按钮路步骤：
+
+1. 先部署 Worker：可用脚本路只做 Worker 部分，或在 Cloudflare 仪表板新建 Worker、把仓内 `worker/_worker.js` 全文粘进去、绑定 KV（名称 `C`）、以 secret 方式设变量 `u` 为自己的 UUID。已有用户保留原 UUID 和 KV 绑定。
+2. 点击上面的 Deploy 按钮，登录 Vercel，按页面提示连接 GitHub 并创建自己的仓库副本；表单里填 `w` 为 Worker 地址（如 `https://cfnew.<子域名>.workers.dev`，不带 UUID/路径/参数）。
 3. Application Preset（旧界面叫 Framework）选择 **Other**；如果自动识别成 Node，请改为 Other。根目录保持仓库根目录，无需手填构建命令。点击 Deploy，等待完成。
-4. 打开分配的面板域名，填写自己的 Worker 域名与 UUID 或自定义路径，即可连接。
+4. 打开分配的面板域名，首次使用先设管理密码，再登录管理页。
 5. 在面板中配置并复制订阅到客户端。订阅使用面板域名；节点的 SNI / Host 与代理入口仍是 Worker。
 
 部署按钮会引导平台登录、Git 授权和创建项目，这些步骤仍需用户在自己的账号完成。项目无需付费数据库或面板 KV。

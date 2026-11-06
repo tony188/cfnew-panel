@@ -6,3 +6,5 @@ node_modules/
 dist/
 .DS_Store
 *.log
+# 一键部署状态文件：UUID 与 KV id 的唯一本地记录，丢了等于丢了管理入口与全部节点凭证
+.cfnew-state

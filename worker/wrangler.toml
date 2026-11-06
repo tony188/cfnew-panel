@@ -1,0 +1,11 @@
+# CFnew Worker 配置模板（Phase 1 ④ vendor 进仓）。
+# KV id 是占位符，部署脚本按名（cfnew-config）查 KV 后替换；
+# `u`（管理 UUID）绝不写进本文件，由脚本以 secret 方式注入（wrangler secret put u）。
+# compatibility_date 须 >= 2024-09-23：core 用到 cloudflare:sockets。
+name = "cfnew"
+main = "_worker.js"
+compatibility_date = "2025-01-01"
+
+[[kv_namespaces]]
+binding = "C"
+id = "__CFNEW_KV_ID__"
