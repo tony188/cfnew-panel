@@ -3250,7 +3250,7 @@ function 渲染版本快照栏() {
 // 返回 [{ key, 旧值, 新值, 联动 }]，联动为 'ech→dkby 联动改写' / 'ev 兜底改写' / ''。
 // 表单里不存在的元素不产生差异（防止字段缺失时把该键误写成空而删配置）。
 function 计算配置差异(新配置, 改前端口控制, 改前协议全关) {
-  var 元素对应表 = { customDNS: 'customDNS', customECHDomain: 'customECHDomain', freeCpu: 'freeCpu', ae: 'apiEnabled', rm: 'regionMatching', qj: 'downgradeControl', dkby: 'portControl', yxby: 'preferredControl', ipv4: 'ipv4Enabled', ipv6: 'ipv6Enabled', ispMobile: 'ispMobile', ispUnicom: 'ispUnicom', ispTelecom: 'ispTelecom', wk: 'wkRegion', tp: 'tp', p: 'customIP', yx: 'yx', yxURL: 'yxURL', s: 's', homepage: 'customHomepage', scu: 'scu', ena: 'enaEnable', jk: 'jkEnable', epd: 'epdEnable', epi: 'epiEnable', egi: 'egiEnable', ev: 'evEnable', et: 'etEnable', ex: 'exEnable', ech: 'echEnable', d: 'customPath', alpn: 'alpn' };
+  var 元素对应表 = { customDNS: 'customDNS', customECHDomain: 'customECHDomain', freeCpu: 'freeCpu', ae: 'apiEnabled', rm: 'regionMatching', qj: 'downgradeControl', dkby: 'portControl', yxby: 'preferredControl', ipv4: 'ipv4Enabled', ipv6: 'ipv6Enabled', ispMobile: 'ispMobile', ispUnicom: 'ispUnicom', ispTelecom: 'ispTelecom', wk: 'wkRegion', tp: 'tp', p: 'customIP', yx: 'yx', yxURL: 'yxURL', s: 'socksConfig', homepage: 'customHomepage', scu: 'scu', ena: 'ena', jk: 'jk', epd: 'epd', epi: 'epi', egi: 'egi', ev: 'ev', et: 'et', ex: 'ex', ech: 'ech', d: 'customPath', alpn: 'alpn' };
   if (!上次加载配置) return Object.keys(新配置).map(function (键) { return { key: 键, 旧值: '', 新值: 新配置[键], 联动: '' }; });
   var 差异 = [];
   var 归一化 = function (键, 值) {
@@ -3569,7 +3569,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     try {
       var 改前端口控制 = 读取字段值('portControl');
-      var 改前协议全关 = [读取字段值('evEnable'), 读取字段值('etEnable'), 读取字段值('exEnable')].every(function (值) { return 值 !== 'yes'; });
+      var 改前协议全关 = [读取开关值('ev', true), 读取开关值('et', false), 读取开关值('ex', false)].every(function (值) { return 值 !== 'yes'; });
       const 新配置 = 收集全部配置();
       var 差异 = 计算配置差异(新配置, 改前端口控制, 改前协议全关);
       if (差异.length === 0) {
