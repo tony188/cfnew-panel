@@ -7,14 +7,18 @@
 # 输入只走环境变量，token 永不入仓、永不回显到日志、永不出现在命令行参数里
 # （curl 鉴权走临时配置文件，wrangler / Vercel CLI 读环境变量）。
 #
-# 必填：
+# 必填（只剩两个真凭证）：
 #   CLOUDFLARE_API_TOKEN  Cloudflare API token（权限：Workers Scripts:Edit、
 #                           Workers KV Storage:Edit；自定义域名绑定另需 Zone:DNS:Edit）
-#   CF_ACCOUNT_ID         Cloudflare 账号 ID
 #   VERCEL_TOKEN          Vercel token（须有读写本项目环境变量与部署的权限）
-# 二选一（至少一组）：
-#   VERCEL_ORG_ID + VERCEL_PROJECT_ID   首次跑时用这两个 link 现有项目；
-#   或已存在 .vercel/project.json（vercel link 一次生成，该文件不入仓）
+# 自动探测（不用填；探测不到或有歧义时才报错让人填）：
+#   CF_ACCOUNT_ID         未提供时调 GET /client/v4/accounts 探测：恰好一个账号就用它；
+#                           0 个或多个则报错停下，提示填 CF_ACCOUNT_ID。显式提供时直接用。
+#   VERCEL_ORG_ID / VERCEL_PROJECT_ID
+#                         未提供且无 .vercel/project.json 时探测：GET /v2/teams 取团队
+#                         （恰好一个就用它；0 个走个人 scope；多个报错），再 GET /v9/projects
+#                         按 name == cfnew-panel 过滤（恰好一个就用它；0 个或多个报错）。
+#                         显式提供时直接用；.vercel/project.json 已存在时优先用它，不探测。
 # 可选：
 #   CFNEW_ADMIN_PASSWORD  管理密码（8–128 字符）。给了才做“设密码→登录→读订阅令牌→
 #                           验 /api/config 与 /sub 三格式”的全套验收，并输出新形态订阅链接；
@@ -28,9 +32,10 @@
 #   CF_API_BASE / VERCEL_API_BASE  API 根地址（默认官方地址；仅供本地验证覆盖）
 #
 # 用法：
-#   CLOUDFLARE_API_TOKEN=... CF_ACCOUNT_ID=... VERCEL_TOKEN=... \
-#     VERCEL_ORG_ID=... VERCEL_PROJECT_ID=... \
+#   CLOUDFLARE_API_TOKEN=... VERCEL_TOKEN=... \
 #     bash scripts/deploy-one-click.sh [--dry-run]
+#   （CF_ACCOUNT_ID、VERCEL_ORG_ID、VERCEL_PROJECT_ID 不填即自动探测；
+#    探测不到或有歧义时再按报错提示补填。）
 #
 # 状态文件 .cfnew-state（gitignored）是 UUID 与 KV id 的唯一本地记录，丢了等于丢了
 # 管理入口与全部节点凭证，只能轮换重建——请备份。二次跑幂等：不轮换 UUID、不重建 KV、
@@ -39,7 +44,7 @@
 # 退出码：0 全部通过；非 0 任一步失败即停（set -euo pipefail），不继续、不静默跳过。
 set -euo pipefail
 
-SCRIPT_VERSION="1.0.0"
+SCRIPT_VERSION="1.1.0"
 TMPDIR="${TMPDIR:-/tmp}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -50,6 +55,12 @@ KV_PLACEHOLDER="__CFNEW_KV_ID__"
 
 WORKER_NAME="${CFNEW_WORKER_NAME:-cfnew}"
 KV_NAME="${CFNEW_KV_NAME:-cfnew-config}"
+# 三个 ID 均为可选：未提供时自动探测（见 detect_cf_account / detect_vercel_project）。
+CF_ACCOUNT_ID="${CF_ACCOUNT_ID:-}"
+VERCEL_ORG_ID="${VERCEL_ORG_ID:-}"
+VERCEL_PROJECT_ID="${VERCEL_PROJECT_ID:-}"
+# 探测 Vercel 项目时按此名过滤（与 README 按钮的 project-name 一致）。
+VERCEL_PROJECT_NAME="cfnew-panel"
 CUSTOM_DOMAIN="${CFNEW_CUSTOM_DOMAIN:-}"
 ADMIN_PASSWORD="${CFNEW_ADMIN_PASSWORD:-}"
 
@@ -84,8 +95,10 @@ usage() {
   --uuid      本地 .cfnew-state 丢失且线上 Worker 已存在时，提供原 UUID 恢复
   --help      显示本帮助
 
-必填环境变量：CLOUDFLARE_API_TOKEN、CF_ACCOUNT_ID、VERCEL_TOKEN，
-以及 VERCEL_ORG_ID + VERCEL_PROJECT_ID（或已存在 .vercel/project.json）。
+必填环境变量：CLOUDFLARE_API_TOKEN、VERCEL_TOKEN。
+自动探测：CF_ACCOUNT_ID（调 GET /client/v4/accounts）、VERCEL_ORG_ID 与
+VERCEL_PROJECT_ID（调 GET /v2/teams 与 GET /v9/projects，按 name == cfnew-panel
+过滤）；探测不到或有歧义时才需补填。已有 .vercel/project.json 时优先用它，不探测。
 可选：CFNEW_ADMIN_PASSWORD、CFNEW_WORKER_NAME、CFNEW_KV_NAME、CFNEW_CUSTOM_DOMAIN。
 EOF
 }
@@ -152,6 +165,37 @@ check_json() {
 is_uuid() { [[ "$1" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]]; }
 is_kv_id() { [[ "$1" =~ ^[0-9a-f]{32}$ ]]; }
 
+# detect_cf_account：CF_ACCOUNT_ID 未提供时自动探测。调 GET /client/v4/accounts，
+# 恰好一个账号就用它的 id；0 个或多个则报错停下，提示填 CF_ACCOUNT_ID。
+# 显式提供时直接用，不探测。dry-run 时只打印探测命令，不执行。
+detect_cf_account() {
+  if [ -n "$CF_ACCOUNT_ID" ]; then
+    say "使用提供的 CF_ACCOUNT_ID（不探测）"
+    return 0
+  fi
+  if [ "$DRY_RUN" = 1 ]; then
+    printf '+ curl -s %s/accounts -H "Authorization: Bearer ***"   # 探测账号：恰好一个就用它\n' "$CF_API_BASE"
+    CF_ACCOUNT_ID="<ACCOUNT_ID>"
+    return 0
+  fi
+  local out="$TMPDIR/cf-accounts.$$.json"
+  local code
+  code="$(api_curl cf GET "$CF_API_BASE/accounts" "$out")"
+  [ "$code" = 200 ] || die "探测 Cloudflare 账号失败（HTTP $code），请填 CF_ACCOUNT_ID 再跑（Cloudflare 仪表板右下角 Account ID）。响应：$(head -c 300 "$out")"
+  local count
+  count="$(jq -r '.result | length' "$out" 2>/dev/null)" || count=""
+  [ -n "$count" ] || die "探测账号的返回不是账号列表，请填 CF_ACCOUNT_ID 再跑。响应：$(head -c 300 "$out")"
+  case "$count" in
+    0) die "该 token 下没有 Cloudflare 账号，请填 CF_ACCOUNT_ID 再跑" ;;
+    1)
+      CF_ACCOUNT_ID="$(jq -r '.result[0].id // empty' "$out" 2>/dev/null)" || CF_ACCOUNT_ID=""
+      [ -n "$CF_ACCOUNT_ID" ] || die "探测到 1 个账号但读不到 id，请填 CF_ACCOUNT_ID 再跑"
+      say "自动探测到 Cloudflare 账号（已填入，不显示）"
+      ;;
+    *) die "该 token 下有 $count 个 Cloudflare 账号，无法确定用哪一个，请填 CF_ACCOUNT_ID 再跑" ;;
+  esac
+}
+
 # write_state：原子写状态文件（0600）。存 UUID 与 KV id，不存任何 token/密码。
 write_state() {
   if [ "$DRY_RUN" = 1 ]; then
@@ -169,7 +213,6 @@ write_state() {
 preflight() {
   say "前置自检"
   [ -n "${CLOUDFLARE_API_TOKEN:-}" ] || die "缺 CLOUDFLARE_API_TOKEN（Cloudflare 仪表板 → My Profile → API Tokens 新建；权限见脚本头）"
-  [ -n "${CF_ACCOUNT_ID:-}" ] || die "缺 CF_ACCOUNT_ID（Cloudflare 仪表板右下角 Account ID）"
   [ -n "${VERCEL_TOKEN:-}" ] || die "缺 VERCEL_TOKEN（Vercel 仪表板 → Settings → Tokens 新建）"
   if [ -n "$ADMIN_PASSWORD" ]; then
     local len="${#ADMIN_PASSWORD}"
@@ -192,9 +235,8 @@ preflight() {
   [ "$vmajor" -ge 33 ] || die "Vercel CLI 须 >= 33，当前：$vver"
   [ -f "$WORKER_DIR/_worker.js" ] || die "缺 worker/_worker.js（仓内 vendor 的 core）"
   [ -f "$WRANGLER_TOML" ] || die "缺 worker/wrangler.toml（仓内模板）"
-  export CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID="$CF_ACCOUNT_ID" VERCEL_TOKEN
   # curl 鉴权配置文件（0600，用完即删；token 永不出现在 argv 与日志里）。
-  # CF 与 Vercel 各一份（token 不同，不可混用）。
+  # CF 与 Vercel 各一份（token 不同，不可混用）。账号探测要走 api_curl，须先建好。
   if [ "$DRY_RUN" = 0 ]; then
     CURL_CFG_CF="$(mktemp)"; CURL_CFG_VC="$(mktemp)"
     chmod 600 "$CURL_CFG_CF" "$CURL_CFG_VC"
@@ -202,6 +244,8 @@ preflight() {
     printf 'header = "Authorization: Bearer %s"\n' "$VERCEL_TOKEN" > "$CURL_CFG_VC"
     trap 'rm -f "$CURL_CFG_CF" "$CURL_CFG_VC" "$COOKIE_JAR"' EXIT
   fi
+  detect_cf_account
+  export CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID="$CF_ACCOUNT_ID" VERCEL_TOKEN
   say "前置自检通过（Node $(node --version)，Vercel CLI $vver）"
 }
 
@@ -373,6 +417,71 @@ step_custom_domain() {
   fi
 }
 
+# detect_vercel_project：VERCEL_ORG_ID / VERCEL_PROJECT_ID 未提供时自动探测。
+# 团队：GET /v2/teams，恰好一个就用它；0 个走个人 scope（不带 teamId）；多个报错
+# 提示填 VERCEL_ORG_ID。项目：GET /v9/projects（带 teamId）按 name == cfnew-panel
+# 过滤，恰好一个就用它的 id；0 个或多个报错提示填 VERCEL_PROJECT_ID。
+# 显式提供的 ID 直接用，不探测。dry-run 时只打印探测命令，不执行。
+detect_vercel_project() {
+  if [ -n "$VERCEL_ORG_ID" ]; then
+    TEAM_ID="$VERCEL_ORG_ID"
+    say "使用提供的 VERCEL_ORG_ID（团队不探测）"
+  elif [ "$DRY_RUN" = 1 ]; then
+    printf '+ curl -s %s/v2/teams -H "Authorization: Bearer ***"   # 探测团队：恰好一个就用它；0 个走个人 scope\n' "$VERCEL_API_BASE"
+    TEAM_ID="<TEAM_ID>"
+  else
+    local out="$TMPDIR/vercel-teams.$$.json"
+    local code
+    code="$(api_curl vc GET "$VERCEL_API_BASE/v2/teams" "$out")"
+    [ "$code" = 200 ] || die "探测 Vercel 团队失败（HTTP $code），请填 VERCEL_ORG_ID 与 VERCEL_PROJECT_ID 再跑。响应：$(head -c 300 "$out")"
+    local count
+    count="$(jq -r '.teams | length' "$out" 2>/dev/null)" || count=""
+    [ -n "$count" ] || die "探测团队的返回不是团队列表，请填 VERCEL_ORG_ID 与 VERCEL_PROJECT_ID 再跑。响应：$(head -c 300 "$out")"
+    case "$count" in
+      0)
+        TEAM_ID=""
+        say "该 token 下没有团队，走个人 scope"
+        ;;
+      1)
+        TEAM_ID="$(jq -r '.teams[0].id // empty' "$out" 2>/dev/null)" || TEAM_ID=""
+        [ -n "$TEAM_ID" ] || die "探测到 1 个团队但读不到 id，请填 VERCEL_ORG_ID 再跑"
+        say "自动探测到 Vercel 团队（已填入，不显示）"
+        ;;
+      *) die "该 token 下有 $count 个 Vercel 团队，无法确定用哪一个，请填 VERCEL_ORG_ID 再跑" ;;
+    esac
+  fi
+  if [ -n "$VERCEL_PROJECT_ID" ]; then
+    PROJECT_ID="$VERCEL_PROJECT_ID"
+    say "使用提供的 VERCEL_PROJECT_ID（项目不探测）"
+    return 0
+  fi
+  if [ "$DRY_RUN" = 1 ]; then
+    local team_disp=""
+    [ -n "$TEAM_ID" ] && team_disp="&teamId=<TEAM_ID>"
+    printf '+ curl -s "%s/v9/projects?limit=100%s" -H "Authorization: Bearer ***"   # 探测项目：按 name == %s 过滤，恰好一个就用它\n' "$VERCEL_API_BASE" "$team_disp" "$VERCEL_PROJECT_NAME"
+    PROJECT_ID="<PROJECT_ID>"
+    return 0
+  fi
+  local team_q=""
+  [ -n "$TEAM_ID" ] && team_q="&teamId=$TEAM_ID"
+  local out2="$TMPDIR/vercel-projects.$$.json"
+  local code2
+  code2="$(api_curl vc GET "$VERCEL_API_BASE/v9/projects?limit=100$team_q" "$out2")"
+  [ "$code2" = 200 ] || die "探测 Vercel 项目失败（HTTP $code2），请填 VERCEL_PROJECT_ID 再跑。响应：$(head -c 300 "$out2")"
+  local count2
+  count2="$(jq -r --arg name "$VERCEL_PROJECT_NAME" '.projects | map(select(.name == $name)) | length' "$out2" 2>/dev/null)" || count2=""
+  [ -n "$count2" ] || die "探测项目的返回不是项目列表，请填 VERCEL_PROJECT_ID 再跑。响应：$(head -c 300 "$out2")"
+  case "$count2" in
+    0) die "该 scope 下没有名为 $VERCEL_PROJECT_NAME 的 Vercel 项目，请填 VERCEL_PROJECT_ID 再跑（或先跑一次 vercel link 生成 .vercel/project.json）" ;;
+    1)
+      PROJECT_ID="$(jq -r --arg name "$VERCEL_PROJECT_NAME" '.projects[] | select(.name == $name) | .id // empty' "$out2" 2>/dev/null)" || PROJECT_ID=""
+      [ -n "$PROJECT_ID" ] || die "探测到 1 个项目但读不到 id，请填 VERCEL_PROJECT_ID 再跑"
+      say "自动探测到 Vercel 项目（已填入，不显示）"
+      ;;
+    *) die "该 scope 下有 $count2 个名为 $VERCEL_PROJECT_NAME 的 Vercel 项目，无法确定用哪一个，请填 VERCEL_PROJECT_ID 再跑" ;;
+  esac
+}
+
 # ---------- 步骤 ⑤ Vercel：link → env w → deploy ----------
 step_vercel_link() {
   say "步骤 ⑤ link Vercel 项目"
@@ -380,19 +489,21 @@ step_vercel_link() {
     PROJECT_ID="$(jq -r '.projectId // empty' "$ROOT/.vercel/project.json" 2>/dev/null)" || true
     TEAM_ID="$(jq -r '.orgId // empty' "$ROOT/.vercel/project.json" 2>/dev/null)" || true
     [ -n "$PROJECT_ID" ] || die ".vercel/project.json 里没有 projectId，请删掉它重跑 vercel link"
-    say "已 link 现有 Vercel 项目（.vercel/project.json）"
+    say "已 link 现有 Vercel 项目（.vercel/project.json），不探测"
     return 0
   fi
-  [ -n "${VERCEL_ORG_ID:-}" ] || die "缺 VERCEL_ORG_ID（或先跑一次 vercel link 生成 .vercel/project.json；该文件不入仓）"
-  [ -n "${VERCEL_PROJECT_ID:-}" ] || die "缺 VERCEL_PROJECT_ID（或先跑一次 vercel link 生成 .vercel/project.json；该文件不入仓）"
-  TEAM_ID="$VERCEL_ORG_ID"
-  PROJECT_ID="$VERCEL_PROJECT_ID"
+  detect_vercel_project
   if [ "$DRY_RUN" = 1 ]; then
     printf '+ %s link --yes --scope <TEAM> --project <PROJECT_ID>\n' "$VERCEL_BIN"
     return 0
   fi
-  run "$VERCEL_BIN" link --yes --scope "$TEAM_ID" --project "$PROJECT_ID" \
-    || die "vercel link 失败（检查 VERCEL_TOKEN 与组织/项目 ID）"
+  if [ -n "$TEAM_ID" ]; then
+    run "$VERCEL_BIN" link --yes --scope "$TEAM_ID" --project "$PROJECT_ID" \
+      || die "vercel link 失败（检查 VERCEL_TOKEN 与组织/项目 ID）"
+  else
+    run "$VERCEL_BIN" link --yes --project "$PROJECT_ID" \
+      || die "vercel link 失败（检查 VERCEL_TOKEN 与项目 ID；个人 scope 不带 --scope）"
+  fi
 }
 
 step_vercel_env() {

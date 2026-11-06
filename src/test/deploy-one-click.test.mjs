@@ -59,3 +59,64 @@ test('README Deploy 按钮指自有仓、含 env=w，不再指 byJoey', async ()
   assert.ok(url.includes('project-name=cfnew-panel') && url.includes('repository-name=cfnew-panel'));
   assert.ok(readme.includes('全新环境备用路'), '按钮旁须写明是全新环境备用路，已部署用户不得点');
 });
+
+test('自动探测 CF_ACCOUNT_ID：未提供时调 GET /client/v4/accounts，恰好一个用其 id，0 个或多个报错提示填 ID', async () => {
+  const script = await read('scripts/deploy-one-click.sh');
+  assert.ok(script.includes('detect_cf_account'), '须有 CF 账号探测函数');
+  assert.ok(script.includes('"$CF_API_BASE/accounts"'), '须调 accounts 接口探测');
+  assert.ok(script.includes('该 token 下没有 Cloudflare 账号') && script.includes('请填 CF_ACCOUNT_ID'), '0 个账号须报错提示填 CF_ACCOUNT_ID');
+  assert.ok(script.includes('个 Cloudflare 账号，无法确定') && script.includes('请填 CF_ACCOUNT_ID'), '多个账号须报错提示填 CF_ACCOUNT_ID');
+  assert.ok(script.includes('自动探测到 Cloudflare 账号'), '恰好一个账号时须取用其 id');
+  assert.ok(!script.includes('die "缺 CF_ACCOUNT_ID'), 'CF_ACCOUNT_ID 不再是必填 die 项');
+});
+
+test('自动探测 Vercel 团队与项目：GET /v2/teams 与 GET /v9/projects，按 name == cfnew-panel 过滤', async () => {
+  const script = await read('scripts/deploy-one-click.sh');
+  assert.ok(script.includes('detect_vercel_project'), '须有 Vercel 探测函数');
+  assert.ok(script.includes('/v2/teams'), '须调 teams 接口探测团队');
+  assert.ok(script.includes('/v9/projects'), '须调 projects 接口探测项目');
+  assert.ok(script.includes('VERCEL_PROJECT_NAME="cfnew-panel"'), '项目须按 name == cfnew-panel 过滤');
+  assert.ok(script.includes('走个人 scope'), '0 个团队走个人 scope（不带 teamId）');
+  assert.ok(script.includes('个 Vercel 团队，无法确定') && script.includes('请填 VERCEL_ORG_ID'), '多个团队须报错提示填 VERCEL_ORG_ID');
+  assert.ok(script.includes('没有名为') && script.includes('请填 VERCEL_PROJECT_ID'), '0 个同名项目须报错提示填 VERCEL_PROJECT_ID');
+  assert.ok(script.includes('个名为') && script.includes('请填 VERCEL_PROJECT_ID'), '多个同名项目须报错提示填 VERCEL_PROJECT_ID');
+  assert.ok(script.includes('自动探测到 Vercel 项目'), '恰好一个同名项目时须取用其 id');
+});
+
+test('显式 ID 覆盖探测：提供了就直接用，不探测', async () => {
+  const script = await read('scripts/deploy-one-click.sh');
+  const cfStart = script.indexOf('detect_cf_account()');
+  assert.ok(cfStart >= 0);
+  assert.ok(script.indexOf('使用提供的 CF_ACCOUNT_ID', cfStart) < script.indexOf('"$CF_API_BASE/accounts"', cfStart), '显式 CF_ACCOUNT_ID 须先于探测调用');
+  const vStart = script.indexOf('detect_vercel_project()');
+  assert.ok(vStart >= 0);
+  assert.ok(script.indexOf('使用提供的 VERCEL_ORG_ID', vStart) < script.indexOf('/v2/teams', vStart), '显式 VERCEL_ORG_ID 须先于团队探测');
+  assert.ok(script.indexOf('使用提供的 VERCEL_PROJECT_ID', vStart) < script.indexOf('/v9/projects', vStart), '显式 VERCEL_PROJECT_ID 须先于项目探测');
+});
+
+test('.vercel/project.json 已存在时优先用它，不探测', async () => {
+  const script = await read('scripts/deploy-one-click.sh');
+  const linkStart = script.indexOf('step_vercel_link()');
+  assert.ok(linkStart >= 0);
+  const pj = script.indexOf('.vercel/project.json', linkStart);
+  const det = script.indexOf('detect_vercel_project', linkStart);
+  assert.ok(pj >= 0 && det >= 0 && pj < det, 'project.json 分支须在探测调用之前');
+  assert.ok(script.includes('（.vercel/project.json），不探测'), 'project.json 分支须说明不探测');
+});
+
+test('必填只剩两个真凭证：CLOUDFLARE_API_TOKEN 与 VERCEL_TOKEN；三个 ID 改为自动探测', async () => {
+  const script = await read('scripts/deploy-one-click.sh');
+  assert.ok(script.includes('必填（只剩两个真凭证）'), '头注释须说明只剩两个必填');
+  assert.ok(script.includes('必填环境变量：CLOUDFLARE_API_TOKEN、VERCEL_TOKEN。'), 'usage 须只列两个必填');
+  assert.ok(script.includes('自动探测：CF_ACCOUNT_ID'), 'usage 须说明 CF_ACCOUNT_ID 自动探测');
+  assert.ok(!script.includes('die "缺 CF_ACCOUNT_ID'), '不得再有 CF_ACCOUNT_ID 必填 die');
+  assert.ok(!script.includes('die "缺 VERCEL_ORG_ID'), '不得再有 VERCEL_ORG_ID 必填 die');
+  assert.ok(!script.includes('die "缺 VERCEL_PROJECT_ID'), '不得再有 VERCEL_PROJECT_ID 必填 die');
+});
+
+test('dry-run 下探测只打印命令、不执行、不写状态', async () => {
+  const script = await read('scripts/deploy-one-click.sh');
+  assert.ok(script.includes('CF_ACCOUNT_ID="<ACCOUNT_ID>"'), 'dry-run 下 CF 探测须用占位 id');
+  assert.ok(script.includes('TEAM_ID="<TEAM_ID>"'), 'dry-run 下团队探测须用占位 id');
+  assert.ok(script.includes('PROJECT_ID="<PROJECT_ID>"'), 'dry-run 下项目探测须用占位 id');
+});
