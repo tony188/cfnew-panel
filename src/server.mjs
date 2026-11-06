@@ -125,7 +125,7 @@ async function handleWorkerApi(request, workerBase, access, suffix) {
   try {
     workerBase = selectWorker(workerBase);
     access = normalizeAccess(access);
-    if (!['/api/config', '/api/preferred-ips', '/region', '/test-api'].includes(suffix) || !['GET', 'POST', 'DELETE'].includes(request.method)) throw new Error('接口不支持');
+    if (!['/api/config', '/api/config/rollback', '/api/config/snapshots', '/api/preferred-ips', '/region', '/test-api'].includes(suffix) || !['GET', 'POST', 'DELETE'].includes(request.method)) throw new Error('接口不支持');
     if (suffix === '/api/config' && request.method === 'GET') return Response.json(await loadWorkerConfig(workerBase, access));
     const uuid = uuidPattern.test(access) ? access : (await loadWorkerConfig(workerBase, access)).uuid;
     const result = await requestWorkerApi(workerBase, uuid, suffix, request.method, request.method === 'GET' ? undefined : await request.text());
@@ -139,7 +139,7 @@ async function handleWorkerApi(request, workerBase, access, suffix) {
       if (value.success && value.config) {
         if (recentConfig.size >= 128) recentConfig.delete(recentConfig.keys().next().value);
         // 以 Worker 已成功持久化后的有效快照消除 KV 跨边缘的短暂旧值。
-        recentConfig.set(key, { expires: Date.now() + 70000, config: { ...value.config, uuid, kvEnabled: true } });
+        recentConfig.set(key, { expires: Date.now() + 70000, config: { ...value.config, uuid, kvEnabled: true, ...(typeof value.configVersion === 'number' ? { configVersion: value.configVersion } : {}), ...(Array.isArray(value.snapshots) ? { snapshots: value.snapshots } : {}) } });
       } else if (value.success) recentConfig.delete(key);
     }
     return new Response(result.body, { status: result.status, headers: { 'Content-Type': 'application/json' } });
@@ -157,7 +157,7 @@ export async function handlePanel(request) {
   try { boundWorker = allowedWorker(); }
   catch (error) { return new Response(error.message, { status: error.status || 503 }); }
   if (boundWorker) {
-    const match = url.pathname.match(/^\/(.+)(\/api\/config|\/api\/preferred-ips|\/region|\/test-api)\/?$/);
+    const match = url.pathname.match(/^\/(.+)(\/api\/config\/rollback|\/api\/config\/snapshots|\/api\/config|\/api\/preferred-ips|\/region|\/test-api)\/?$/);
     if (match) return handleWorkerApi(request, boundWorker, match[1], match[2]);
   }
   if (['/api/preferred/probe', '/api/preferred/list'].includes(url.pathname)) {

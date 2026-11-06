@@ -58,7 +58,9 @@ test('未绑定 KV 可生成订阅所需配置，但保存明确失败', async (
 
 test('并发 Worker 与订阅实例不会串用 UUID、KV 或域名', async () => {
   const results = await Promise.all([uuid, otherUuid].map(async (id, index) => {
-    const config = await (await worker.fetch(req('/' + id + '/api/config'), { u: id, c: memoryKV({ yx: '104.16.1.' + (index + 1) + ':443' }) })).json();
+    // 改后 core 的 epi 默认 'no'（2026-11-05 替换：关 uouin 拉取）；epi 是优选地址总开关，
+    // 不显式开它自定义 yx 不生成节点。本测试要的是优选地址节点，故显式 epi: 'yes'。
+    const config = await (await worker.fetch(req('/' + id + '/api/config'), { u: id, c: memoryKV({ yx: '104.16.1.' + (index + 1) + ':443', epi: 'yes' }) })).json();
     const engine = createSubscriptionEngine(config, id);
     return atob(await (await engine.subscribe(new Request('https://worker' + index + '.example/' + id + '/sub'))).text());
   }));

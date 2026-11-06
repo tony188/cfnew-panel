@@ -2292,6 +2292,9 @@ async function 处理订阅值(请求241, 用户240 = null) {
                     <div id="currentConfig" style="background: rgba(0, 0, 0, 0.9); border: 1px solid #00f0ff; padding: 15px; margin: 10px 0; font-family: 'Courier New', monospace; color: #00f0ff;">
                             ${翻译值.loading}
                     </div>
+                    <div id="configVersionBar" style="background: rgba(0, 0, 0, 0.9); border: 1px solid #00f0ff; padding: 10px 15px; margin: 10px 0; font-family: 'Courier New', monospace; color: #00f0ff;">配置版本：<span id="configVersionText">–</span> · 快照 <span id="configSnapshotCount">0</span> 个（保留 5 版）</div>
+                    <div id="configDiffPreview" style="display: none; background: rgba(0, 0, 0, 0.9); border: 1px solid #ffb400; padding: 10px 15px; margin: 10px 0; font-family: 'Courier New', monospace; color: #ffb400; white-space: pre-wrap;"></div>
+                    <div id="snapshotList" style="background: rgba(0, 0, 0, 0.9); border: 1px solid #00f0ff; padding: 10px 15px; margin: 10px 0; font-family: 'Courier New', monospace; color: #00f0ff;"></div>
                     <div id="pathTypeInfo" style="background: rgba(15, 3, 40, 0.7); border: 1px solid #00f0ff; padding: 15px; margin: 10px 0; font-family: 'Courier New', monospace; color: #00f0ff;">
                             <div style="font-weight: bold; margin-bottom: 8px; color: #00ff9d; text-shadow: 0 0 5px #00ff9d;">${翻译值.currentConfig}</div>
                             <div id="pathTypeStatus">${翻译值.checking}</div>
@@ -3172,6 +3175,11 @@ function 收集界面配置() {
   return 配置;
 }
 
+// Phase 1 ①：配置版本与快照（浏览器侧本地状态，刷新页面即重载）。
+var 上次加载配置 = null;
+var 上次加载版本 = 0;
+var 上次快照列表 = [];
+
 async function 加载当前配置() {
   const 接口网址20117 = window.CFNEW.apiBase + '/api/config';
   try {
@@ -3186,11 +3194,15 @@ async function 加载当前配置() {
       return;
     }
     const 配置 = await 响应20116.json();
+    上次加载配置 = 配置;
+    上次加载版本 = (typeof 配置.configVersion === 'number') ? 配置.configVersion : 0;
+    上次快照列表 = Array.isArray(配置.snapshots) ? 配置.snapshots : [];
+    渲染版本快照栏();
 
     // 过滤掉入口鉴权与 KV 状态字段。
     const 显示配置 = {};
     for (const [键20114, 值20113] of Object.entries(配置)) {
-      if (键20114 !== 'kvEnabled' && 键20114 !== 'uuid' && 键20114 !== 'coreVersion') {
+      if (键20114 !== 'kvEnabled' && 键20114 !== 'uuid' && 键20114 !== 'coreVersion' && 键20114 !== 'configVersion' && 键20114 !== 'snapshots') {
         显示配置[键20114] = 值20113;
       }
     }
@@ -3207,6 +3219,85 @@ async function 加载当前配置() {
     应用配置到界面(配置);
   } catch (错误20111) {
     document.getElementById('currentConfig').textContent = '加载配置失败: ' + 错误20111.message;
+  }
+}
+
+// Phase 1 ①：渲染版本栏与快照列表（回滚按钮用事件绑定，不用内联 onclick）。
+function 渲染版本快照栏() {
+  var 版本元素 = document.getElementById('configVersionText');
+  if (版本元素) 版本元素.textContent = 'v' + 上次加载版本;
+  var 数量元素 = document.getElementById('configSnapshotCount');
+  if (数量元素) 数量元素.textContent = String(上次快照列表.length);
+  var 列表元素 = document.getElementById('snapshotList');
+  if (!列表元素) return;
+  if (!上次快照列表.length) { 列表元素.textContent = '暂无快照'; return; }
+  var html = '';
+  上次快照列表.forEach(function (快照) {
+    var 是当前 = (快照.version === 上次加载版本);
+    var 改动 = (快照.changedKeys && 快照.changedKeys.length) ? 快照.changedKeys.join(', ') : '—';
+    html += '<div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px solid rgba(0, 240, 255, 0.2);">'
+      + '<span>v' + 快照.version + ' · ' + (快照.at || '') + ' · 改动：' + 改动 + (是当前 ? ' · 当前版本' : '') + '</span>';
+    if (!是当前) html += '<button class="action-btn" type="button" data-rollback-version="' + 快照.version + '" style="padding: 2px 10px;">回滚</button>';
+    html += '</div>';
+  });
+  列表元素.innerHTML = html;
+  列表元素.querySelectorAll('[data-rollback-version]').forEach(function (按钮) {
+    按钮.addEventListener('click', function () { 回滚配置到版本(Number(按钮.getAttribute('data-rollback-version'))); });
+  });
+}
+
+// Phase 1 ①：计算表单值与上次加载配置的差异；yx 按逗号归一化后再比较。
+// 返回 [{ key, 旧值, 新值, 联动 }]，联动为 'ech→dkby 联动改写' / 'ev 兜底改写' / ''。
+// 表单里不存在的元素不产生差异（防止字段缺失时把该键误写成空而删配置）。
+function 计算配置差异(新配置, 改前端口控制, 改前协议全关) {
+  var 元素对应表 = { customDNS: 'customDNS', customECHDomain: 'customECHDomain', freeCpu: 'freeCpu', ae: 'apiEnabled', rm: 'regionMatching', qj: 'downgradeControl', dkby: 'portControl', yxby: 'preferredControl', ipv4: 'ipv4Enabled', ipv6: 'ipv6Enabled', ispMobile: 'ispMobile', ispUnicom: 'ispUnicom', ispTelecom: 'ispTelecom', wk: 'wkRegion', tp: 'tp', p: 'customIP', yx: 'yx', yxURL: 'yxURL', s: 's', homepage: 'customHomepage', scu: 'scu', ena: 'enaEnable', jk: 'jkEnable', epd: 'epdEnable', epi: 'epiEnable', egi: 'egiEnable', ev: 'evEnable', et: 'etEnable', ex: 'exEnable', ech: 'echEnable', d: 'customPath', alpn: 'alpn' };
+  if (!上次加载配置) return Object.keys(新配置).map(function (键) { return { key: 键, 旧值: '', 新值: 新配置[键], 联动: '' }; });
+  var 差异 = [];
+  var 归一化 = function (键, 值) {
+    if (键 === 'yx') return String(值 || '').split(/[,\\r\\n]+/).map(function (行) { return 行.trim(); }).filter(Boolean).join(',');
+    return String(值 === undefined || 值 === null ? '' : 值);
+  };
+  Object.keys(新配置).forEach(function (键) {
+    if (元素对应表[键] && !document.getElementById(元素对应表[键])) return;
+    if (归一化(键, 新配置[键]) === 归一化(键, 上次加载配置[键])) return;
+    var 联动 = '';
+    if (键 === 'dkby' && 新配置.ech === 'yes' && 改前端口控制 !== 'yes') 联动 = 'ech→dkby 联动改写';
+    if (键 === 'ev' && 新配置.ev === 'yes' && 改前协议全关) 联动 = 'ev 兜底改写';
+    差异.push({ key: 键, 旧值: 上次加载配置[键], 新值: 新配置[键], 联动: 联动 });
+  });
+  return 差异;
+}
+
+// Phase 1 ①：保存前在页面上显示本次改了哪几项（不二次确认，显示后即保存）。
+function 显示保存前差异(差异) {
+  var 预览元素 = document.getElementById('configDiffPreview');
+  if (!预览元素) return;
+  var 行 = ['本次改动（' + 差异.length + ' 项，只保存改动字段）：'];
+  差异.forEach(function (项) {
+    行.push('· ' + 项.key + '：' + String(项.旧值 === undefined ? '' : 项.旧值) + ' → ' + String(项.新值 === undefined ? '' : 项.新值) + (项.联动 ? '（' + 项.联动 + '）' : ''));
+  });
+  预览元素.textContent = 行.join('\\n');
+  预览元素.style.display = 'block';
+}
+
+// Phase 1 ①：回滚到指定版本；回滚本身记为一个新版本，历史不改写。
+async function 回滚配置到版本(目标版本) {
+  if (!window.confirm('确认回滚到 v' + 目标版本 + ' 吗？回滚本身会记为一个新版本，历史不改写。')) return;
+  try {
+    显示操作状态('正在回滚到 v' + 目标版本 + '…');
+    const 响应 = await fetch(window.CFNEW.apiBase + '/api/config/rollback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ targetVersion: 目标版本 })
+    });
+    const 结果 = await 响应.json();
+    if (!响应.ok || !结果.success) throw new Error(结果.message || '回滚失败');
+    显示操作状态('已回滚到 v' + 目标版本 + '，当前版本 v' + 结果.configVersion);
+    显示提示('已回滚到 v' + 目标版本, 'success');
+    await 加载当前配置();
+  } catch (错误) {
+    显示操作状态('回滚失败：' + 错误.message, 'err');
+    显示提示('回滚失败：' + 错误.message, 'error');
   }
 }
 
@@ -3477,7 +3568,19 @@ document.addEventListener('DOMContentLoaded', function () {
       本地值20082.disabled = true;
     }
     try {
-      await 保存配置(收集全部配置());
+      var 改前端口控制 = 读取字段值('portControl');
+      var 改前协议全关 = [读取字段值('evEnable'), 读取字段值('etEnable'), 读取字段值('exEnable')].every(function (值) { return 值 !== 'yes'; });
+      const 新配置 = 收集全部配置();
+      var 差异 = 计算配置差异(新配置, 改前端口控制, 改前协议全关);
+      if (差异.length === 0) {
+        显示操作状态('没有改动，无需保存');
+        显示提示('没有改动，无需保存', 'success');
+        return;
+      }
+      显示保存前差异(差异);
+      var 只发改动 = {};
+      差异.forEach(function (项) { 只发改动[项.key] = 新配置[项.key]; });
+      await 保存配置(只发改动);
     } finally {
       if (本地值20082) {
         本地值20082.classList.remove('cp-action-btn-saving');
