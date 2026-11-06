@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
-import test, { after } from 'node:test';
+import test, { after, before } from 'node:test';
 
 process.env.CFNEW_ALLOW_PRIVATE = 'yes';
 const { handlePanel } = await import('../server.mjs');
+import { loginCookie, fetchSubToken, loginWorkerSession, forwardHeaders } from './auth-helpers.mjs';
 
 // 测试 UUID（仅本地测试用，不含任何真实 UUID）。
 const uuidA = '166c5e95-001b-445c-8c13-bac9d1bfdc86';
@@ -29,10 +30,15 @@ function makeKv() {
   return { store, kv };
 }
 
+// Phase 1 ③：管理接口须带会话；会话按 KV 记（密码存在各 KV 里）。
+const sessions = new Map();
 function callWorker(uuid, kv, path, method = 'GET', body) {
+  const headers = { 'Content-Type': 'application/json' };
+  const session = sessions.get(kv);
+  if (session) headers['X-CFNEW-SESSION'] = session;
   const request = new Request('https://worker.example/' + uuid + path, {
     method,
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   return worker.fetch(request, { u: uuid, C: kv });
@@ -45,6 +51,9 @@ async function callJson(uuid, kv, path, method = 'GET', body) {
 
 // ---------- A 组：core 直测 ----------
 const { store: storeA, kv: kvA } = makeKv();
+sessions.set(kvA, await loginWorkerSession(
+  (path, init) => worker.fetch(new Request('https://worker.example' + path, { method: init?.method || 'GET', headers: { 'Content-Type': 'application/json' }, body: init?.body }), { u: uuidA, C: kvA }),
+  uuidA));
 
 test('A1 空 KV 首次 GET：版本 0、无快照', async () => {
   const { status, json } = await callJson(uuidA, kvA, '/api/config');
@@ -135,6 +144,9 @@ test('A9 迁移：无版本旧配置首次写入成 v1，v0 快照即旧配置',
   const { store, kv } = makeKv();
   // 旧配置：只有 c，无 c_meta（部署 ① 之前的形态）。
   await kv.put('c', JSON.stringify({ ena: 'yes', ech: 'no' }));
+  sessions.set(kv, await loginWorkerSession(
+    (path, init) => worker.fetch(new Request('https://worker.example' + path, { method: init?.method || 'GET', headers: { 'Content-Type': 'application/json' }, body: init?.body }), { u: uuidA, C: kv }),
+    uuidA));
   const saved = await callJson(uuidA, kv, '/api/config', 'POST', { ech: 'yes' });
   assert.equal(saved.json.configVersion, 1);
   assert.deepEqual(saved.json.changedKeys, ['ech']);
@@ -153,7 +165,7 @@ const httpServer = createServer(async (req, res) => {
   const chunks = [];
   for await (const chunk of req) chunks.push(chunk);
   const body = Buffer.concat(chunks).toString();
-  const init = { method: req.method, headers: { 'Content-Type': 'application/json' } };
+  const init = { method: req.method, headers: forwardHeaders(req) };
   if (body) init.body = body;
   const r = await worker.fetch(new Request('https://worker' + req.url, init), { u: uuidB, C: kvB });
   res.writeHead(r.status, { 'Content-Type': 'application/json' });
@@ -163,15 +175,27 @@ await new Promise(resolve => httpServer.listen(0, '127.0.0.1', resolve));
 process.env.w = 'http://127.0.0.1:' + httpServer.address().port;
 after(async () => { httpServer.closeAllConnections(); await new Promise(resolve => httpServer.close(resolve)); });
 
-async function panel(path, method = 'GET', body) {
-  const init = { method };
-  if (body !== undefined) init.body = JSON.stringify(body);
+// Phase 1 ③：B 组经面板调管理接口须带会话 cookie；订阅走新形态 /sub/<令牌>。
+let cookieB = '';
+async function panel(path, method = 'GET', body, extraHeaders = {}) {
+  const init = { method, headers: { ...extraHeaders } };
+  if (cookieB) init.headers.Cookie = cookieB;
+  if (body !== undefined) { init.body = JSON.stringify(body); init.headers['Content-Type'] = 'application/json'; }
   return handlePanel(new Request('https://panel.example/' + uuidB + path, init));
 }
+const callB = (path, init = {}) => panel(path, init.method || 'GET', init.body ? JSON.parse(init.body) : undefined, init.headers || {});
+// 顶层 await 里直接登录会在全量运行时偶发 socket hang up（面板 httpRequest 与假 Worker 服务的竞态），
+// 改在 before() 里登录：登录本就是测试准备，且 before 在模块加载完成后才跑。
+let tokenB = '';
+before(async () => {
+  cookieB = await loginCookie(callB);
+  tokenB = await fetchSubToken(callB, cookieB);
+});
 
 async function subNodeCount() {
-  const res = await panel('/sub');
-  assert.equal(res.status, 200);
+  // 新形态订阅是根级 /sub/<令牌>，不在 /<uuid> 之下；绑定模式下不带 host/uuid 参数。
+  const res = await handlePanel(new Request('https://panel.example/sub/' + tokenB));
+  if (res.status !== 200) assert.fail('订阅应成功：' + res.status + ' ' + await res.text());
   const lines = Buffer.from(await res.text(), 'base64').toString('utf8').split('\n').map(s => s.trim()).filter(Boolean);
   return lines.length;
 }

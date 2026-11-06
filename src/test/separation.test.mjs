@@ -4,6 +4,7 @@ import test from 'node:test';
 import { createSubscriptionEngine } from '../engine.mjs';
 import { normalizeWorker } from '../server.mjs';
 import { isPublicAddress, normalizePreferredList } from '../preferred.mjs';
+import { loginWorkerSession } from './auth-helpers.mjs';
 
 const uuid = '351c9981-04b6-4103-aa4b-864aa9c91469';
 const otherUuid = '67f889ca-63fc-4aee-9454-6a33cf4c9466';
@@ -16,6 +17,11 @@ function memoryKV(config = {}) {
   return { get: async (key, type) => type === 'json' ? JSON.parse(values.get(key) || 'null') : values.get(key), put: async (key, value) => values.set(key, value) };
 }
 const req = (path, init) => new Request('https://worker.example' + path, init);
+// Phase 1 ③：直调 Worker 管理接口须带会话；返回一个已登录的调用函数。
+async function authedFetch(env, id = uuid) {
+  const token = await loginWorkerSession((path, init) => worker.fetch(req(path, init), env), id);
+  return (path, init = {}) => worker.fetch(req(path, { ...init, headers: { ...(init.headers || {}), 'X-CFNEW-SESSION': token } }), env);
+}
 
 test('Worker 首页和订阅路径没有页面或订阅生成', async () => {
   assert.equal(await (await worker.fetch(req('/'))).text(), 'hello');
@@ -28,32 +34,38 @@ test('UUID 配置接口严格鉴权，并返回环境变量与 KV 的有效配�
   assert.equal((await worker.fetch(req('/wrong/api/config'), env)).status, 404);
   assert.equal((await worker.fetch(req('/api/config'), env)).status, 404);
   assert.equal((await worker.fetch(req('/wrong/api/config', { method: 'POST', body: '{"qj":"no"}' }), env)).status, 404);
-  const response = await worker.fetch(req('/' + uuid + '/api/config'), env);
+  assert.equal((await worker.fetch(req('/' + uuid + '/api/config'), env)).status, 401, '无会话读配置应被拒');
+  const call = await authedFetch(env);
+  const response = await call('/' + uuid + '/api/config');
   const config = await response.json();
   assert.equal(config.s, env.s); assert.equal(config.et, 'yes'); assert.equal(config.qj, 'only'); assert.equal(config.kvEnabled, true);
   assert.equal(response.headers.get('access-control-allow-origin'), '*');
-  assert.equal((await worker.fetch(req('/custom/nested/api/config'), env)).status, 200);
+  assert.equal((await call('/custom/nested/api/config')).status, 200);
 });
 
 test('配置保存、清空、非法输入以及优选地址增删均按真实 API 执行', async () => {
   const env = { u: uuid, c: memoryKV({ ae: 'yes', yx: '104.16.1.1:443#旧值' }) };
-  let response = await worker.fetch(req('/' + uuid + '/api/config', { method: 'POST', body: '{"qj":"only","et":"yes"}' }), env);
+  const call = await authedFetch(env);
+  let response = await call('/' + uuid + '/api/config', { method: 'POST', body: '{"qj":"only","et":"yes"}' });
   assert.equal((await response.json()).success, true);
-  assert.equal((await (await worker.fetch(req('/' + uuid + '/api/config'), env)).json()).qj, 'only');
-  response = await worker.fetch(req('/' + uuid + '/api/config', { method: 'POST', body: '{"qj":""}' }), env);
+  assert.equal((await (await call('/' + uuid + '/api/config')).json()).qj, 'only');
+  response = await call('/' + uuid + '/api/config', { method: 'POST', body: '{"qj":""}' });
   assert.equal((await response.json()).config.qj, '');
-  assert.equal((await worker.fetch(req('/' + uuid + '/api/config', { method: 'POST', body: '{"__proto__":{}}' }), env)).status, 400);
-  response = await worker.fetch(req('/' + uuid + '/api/preferred-ips', { method: 'POST', body: '{"ip":"104.16.1.2","port":8443,"name":"新增"}' }), env);
+  assert.equal((await call('/' + uuid + '/api/config', { method: 'POST', body: '{"__proto__":{}}' })).status, 400);
+  response = await call('/' + uuid + '/api/preferred-ips', { method: 'POST', body: '{"ip":"104.16.1.2","port":8443,"name":"新增"}' });
   assert.equal((await response.json()).added, 1);
-  response = await worker.fetch(req('/' + uuid + '/api/preferred-ips', { method: 'DELETE', body: '{"ip":"104.16.1.2","port":8443}' }), env);
+  response = await call('/' + uuid + '/api/preferred-ips', { method: 'DELETE', body: '{"ip":"104.16.1.2","port":8443}' });
   assert.equal((await response.json()).success, true);
 });
 
-test('未绑定 KV 可生成订阅所需配置，但保存明确失败', async () => {
+test('未绑定 KV 时管理接口不可用，订阅生成仍走引擎直调', async () => {
+  // ③ 下无 KV 即无处存密码/会话/令牌，管理接口一律 401；订阅生成不经过 Worker 鉴权。
   const env = { U: uuid, YX: '104.16.1.1:443', ET: 'yes' };
-  const config = await (await worker.fetch(req('/' + uuid + '/api/config'), env)).json();
-  assert.equal(config.kvEnabled, false); assert.equal(config.yx, env.YX);
-  assert.equal((await worker.fetch(req('/' + uuid + '/api/config', { method: 'POST', body: '{}' }), env)).status, 503);
+  assert.equal((await worker.fetch(req('/' + uuid + '/api/config'), env)).status, 401);
+  assert.equal((await worker.fetch(req('/' + uuid + '/api/config', { method: 'POST', body: '{}' }), env)).status, 401);
+  const engine = createSubscriptionEngine({ ev: 'yes', et: 'yes', ex: 'no', yx: env.YX, epi: 'yes', epd: 'no', egi: 'no', ena: 'no' }, uuid);
+  const sub = await (await engine.subscribe(new Request('https://worker.example/' + uuid + '/sub'))).text();
+  assert.ok(atob(sub).includes('104.16.1.1:443'));
 });
 
 test('并发 Worker 与订阅实例不会串用 UUID、KV 或域名', async () => {
@@ -102,11 +114,12 @@ test('连接参数拒绝非 HTTPS、用户信息和带路径地址', () => {
 
 test('旧面板地址字段兼容，同时仍拒绝未定义字段', async () => {
   const env = { u: uuid, c: memoryKV() };
-  const response = await worker.fetch(req('/' + uuid + '/api/config', { method: 'POST', body: '{"customIP":"104.16.1.1:443","yx":"104.16.1.2:8443#优选"}' }), env);
+  const call = await authedFetch(env);
+  const response = await call('/' + uuid + '/api/config', { method: 'POST', body: '{"customIP":"104.16.1.1:443","yx":"104.16.1.2:8443#优选"}' });
   assert.equal(response.status, 200);
-  const config = await (await worker.fetch(req('/' + uuid + '/api/config'), env)).json();
+  const config = await (await call('/' + uuid + '/api/config')).json();
   assert.equal(config.p, '104.16.1.1:443'); assert.equal(config.yx, '104.16.1.2:8443#优选');
-  assert.equal((await worker.fetch(req('/' + uuid + '/api/config', { method: 'POST', body: '{"unknown":"value"}' }), env)).status, 400);
+  assert.equal((await call('/' + uuid + '/api/config', { method: 'POST', body: '{"unknown":"value"}' })).status, 400);
 });
 
 test('手填域名、IPv4和IPv6显式端口在各客户端格式中保留', async () => {

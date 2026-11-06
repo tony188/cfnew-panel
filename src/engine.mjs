@@ -2295,6 +2295,27 @@ async function 处理订阅值(请求241, 用户240 = null) {
                     <div id="configVersionBar" style="background: rgba(0, 0, 0, 0.9); border: 1px solid #00f0ff; padding: 10px 15px; margin: 10px 0; font-family: 'Courier New', monospace; color: #00f0ff;">配置版本：<span id="configVersionText">–</span> · 快照 <span id="configSnapshotCount">0</span> 个（保留 5 版）</div>
                     <div id="configDiffPreview" style="display: none; background: rgba(0, 0, 0, 0.9); border: 1px solid #ffb400; padding: 10px 15px; margin: 10px 0; font-family: 'Courier New', monospace; color: #ffb400; white-space: pre-wrap;"></div>
                     <div id="snapshotList" style="background: rgba(0, 0, 0, 0.9); border: 1px solid #00f0ff; padding: 10px 15px; margin: 10px 0; font-family: 'Courier New', monospace; color: #00f0ff;"></div>
+                    <div id="authTokenSection" style="background: rgba(0, 0, 0, 0.9); border: 1px solid #00f0ff; padding: 15px; margin: 10px 0; font-family: 'Courier New', monospace; color: #00f0ff;">
+                            <div style="font-weight: bold; margin-bottom: 8px; color: #00ff9d; text-shadow: 0 0 5px #00ff9d;">🔑 订阅令牌</div>
+                            <div style="word-break: break-all;">订阅地址：<a id="subTokenLink" href="" target="_blank" rel="noopener noreferrer" style="color: #00f0ff;"></a></div>
+                            <div id="subTokenStatus" style="margin: 8px 0; color: #7aa9c4;"></div>
+                            <div>
+                                <button type="button" id="rotateSubTokenBtn" style="padding: 8px 16px; margin-right: 8px; background: rgba(0, 0, 0, 0.8); border: 2px solid #00f0ff; color: #00f0ff; font-family: 'Courier New', monospace; cursor: pointer;">轮换订阅令牌</button>
+                                <button type="button" id="revokeSubTokenBtn" style="padding: 8px 16px; background: rgba(0, 0, 0, 0.8); border: 2px solid #ff3860; color: #ff3860; font-family: 'Courier New', monospace; cursor: pointer;">撤销订阅令牌</button>
+                            </div>
+                            <small style="color: #7aa9c4; font-size: 0.85rem;">轮换后旧订阅地址立即失效，OpenClash 与 SingX 须重导订阅；已导入的节点凭证不受影响。撤销后订阅地址失效，直到再次轮换生成新令牌。</small>
+                    </div>
+                    <div id="authPasswordSection" style="background: rgba(0, 0, 0, 0.9); border: 1px solid #00f0ff; padding: 15px; margin: 10px 0; font-family: 'Courier New', monospace; color: #00f0ff;">
+                            <div style="font-weight: bold; margin-bottom: 8px; color: #00ff9d; text-shadow: 0 0 5px #00ff9d;">🔒 管理密码</div>
+                            <div style="margin-bottom: 8px;"><input type="password" id="oldPassword" placeholder="旧密码" autocomplete="current-password" style="width: 100%; padding: 10px; background: rgba(0, 0, 0, 0.8); border: 1px solid #00f0ff; color: #00f0ff; font-family: 'Courier New', monospace;"></div>
+                            <div style="margin-bottom: 8px;"><input type="password" id="newPassword" placeholder="新密码（8–128 个字符）" autocomplete="new-password" style="width: 100%; padding: 10px; background: rgba(0, 0, 0, 0.8); border: 1px solid #00f0ff; color: #00f0ff; font-family: 'Courier New', monospace;"></div>
+                            <div style="margin-bottom: 8px;"><input type="password" id="newPasswordConfirm" placeholder="确认新密码" autocomplete="new-password" style="width: 100%; padding: 10px; background: rgba(0, 0, 0, 0.8); border: 1px solid #00f0ff; color: #00f0ff; font-family: 'Courier New', monospace;"></div>
+                            <div>
+                                <button type="button" id="changePasswordBtn" style="padding: 8px 16px; margin-right: 8px; background: rgba(0, 0, 0, 0.8); border: 2px solid #00f0ff; color: #00f0ff; font-family: 'Courier New', monospace; cursor: pointer;">修改管理密码</button>
+                                <button type="button" id="logoutBtn" style="padding: 8px 16px; background: rgba(0, 0, 0, 0.8); border: 2px solid #ff3860; color: #ff3860; font-family: 'Courier New', monospace; cursor: pointer;">退出登录</button>
+                            </div>
+                            <small style="color: #7aa9c4; font-size: 0.85rem;">改密码后全部会话失效，需重新登录。忘密码时在 Cloudflare 仪表板删除 KV 键 admin_pass 后重新设置。</small>
+                    </div>
                     <div id="pathTypeInfo" style="background: rgba(15, 3, 40, 0.7); border: 1px solid #00f0ff; padding: 15px; margin: 10px 0; font-family: 'Courier New', monospace; color: #00f0ff;">
                             <div style="font-weight: bold; margin-bottom: 8px; color: #00ff9d; text-shadow: 0 0 5px #00ff9d;">${翻译值.currentConfig}</div>
                             <div id="pathTypeStatus">${翻译值.checking}</div>
@@ -2937,6 +2958,75 @@ async function 测试接口() {
   }
 }
 
+// Phase 1 ③：订阅令牌与管理密码（浏览器侧）。
+function 会话过期处理() {
+  显示状态('会话已过期，请重新登录', 'error');
+  setTimeout(function () { window.location.reload(); }, 1500);
+}
+
+async function 刷新订阅令牌显示(令牌) {
+  const 链接元素 = document.getElementById('subTokenLink');
+  const 状态元素 = document.getElementById('subTokenStatus');
+  if (!链接元素 || !状态元素) return;
+  if (令牌) {
+    const 地址 = location.origin + '/sub/' + 令牌;
+    链接元素.href = 地址;
+    链接元素.textContent = 地址;
+    window.CFNEW.subUrl = 地址;
+    状态元素.textContent = '订阅令牌有效。';
+  } else {
+    链接元素.href = '';
+    链接元素.textContent = '';
+    window.CFNEW.subUrl = '';
+    状态元素.textContent = '订阅令牌已撤销，订阅地址已失效；轮换可生成新令牌。';
+  }
+}
+
+async function 轮换订阅令牌() {
+  if (!confirm('轮换后旧订阅地址立即失效，OpenClash 与 SingX 须重导订阅。确定轮换吗？')) return;
+  try {
+    const 响应 = await fetch(window.CFNEW.apiBase + '/api/auth/rotate-sub-token', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+    if (响应.status === 401) { 会话过期处理(); return; }
+    const 结果 = await 响应.json();
+    if (!响应.ok || !结果.success) throw new Error(结果.message || 结果.error || '轮换失败（HTTP ' + 响应.status + '）');
+    await 刷新订阅令牌显示(结果.token);
+    显示状态('订阅令牌已轮换，旧地址已失效', 'success');
+  } catch (错误) { 显示状态('轮换订阅令牌失败: ' + 错误.message, 'error'); }
+}
+
+async function 撤销订阅令牌() {
+  if (!confirm('撤销后订阅地址立即失效，直到再次轮换生成新令牌。确定撤销吗？')) return;
+  try {
+    const 响应 = await fetch(window.CFNEW.apiBase + '/api/auth/revoke-sub-token', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+    if (响应.status === 401) { 会话过期处理(); return; }
+    const 结果 = await 响应.json();
+    if (!响应.ok || !结果.success) throw new Error(结果.message || 结果.error || '撤销失败（HTTP ' + 响应.status + '）');
+    await 刷新订阅令牌显示(null);
+    显示状态('订阅令牌已撤销', 'success');
+  } catch (错误) { 显示状态('撤销订阅令牌失败: ' + 错误.message, 'error'); }
+}
+
+async function 修改管理密码() {
+  const 旧密码 = document.getElementById('oldPassword')?.value || '';
+  const 新密码 = document.getElementById('newPassword')?.value || '';
+  const 确认密码 = document.getElementById('newPasswordConfirm')?.value || '';
+  if (新密码 !== 确认密码) { 显示状态('两次输入的新密码不一致', 'error'); return; }
+  if (新密码.length < 8 || 新密码.length > 128) { 显示状态('新密码长度须为 8–128 个字符', 'error'); return; }
+  try {
+    const 响应 = await fetch(window.CFNEW.apiBase + '/api/auth/change-password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ oldPassword: 旧密码, newPassword: 新密码 }) });
+    if (响应.status === 401) { 会话过期处理(); return; }
+    const 结果 = await 响应.json();
+    if (!响应.ok || !结果.success) throw new Error(结果.message || 结果.error || '修改失败（HTTP ' + 响应.status + '）');
+    显示状态('管理密码已修改，请重新登录', 'success');
+    setTimeout(function () { window.location.reload(); }, 1500);
+  } catch (错误) { 显示状态('修改管理密码失败: ' + 错误.message, 'error'); }
+}
+
+async function 退出登录() {
+  try { await fetch(window.CFNEW.apiBase + '/api/auth/logout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }); } catch {}
+  window.location.reload();
+}
+
 // 配置管理相关函数
 async function 检查键值状态() {
   const 接口网址20134 = window.CFNEW.apiBase + '/api/config';
@@ -3184,6 +3274,7 @@ async function 加载当前配置() {
   const 接口网址20117 = window.CFNEW.apiBase + '/api/config';
   try {
     const 响应20116 = await fetch(接口网址20117);
+    if (响应20116.status === 401) { 会话过期处理(); return; }
     if (响应20116.status === 503) {
       document.getElementById('currentConfig').textContent = 'KV存储未配置，无法加载配置';
       return;
@@ -3353,6 +3444,7 @@ async function 保存配置(配置数据20107) {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(配置数据20107)
     });
+    if (响应.status === 401) { 会话过期处理(); throw new Error('会话已过期，请重新登录'); }
     let 结果;
     try { 结果 = await 响应.json(); } catch {
       throw new Error(响应.status === 413 ? '配置过大，请减少优选条目或改用列表 URL' : '服务器响应格式异常（HTTP ' + 响应.status + '），请稍后重试');
@@ -3627,6 +3719,27 @@ document.addEventListener('DOMContentLoaded', function () {
   });
   const 值值重置 = document.getElementById('cpBtnReset');
   if (值值重置) 值值重置.addEventListener('click', 重置全部配置);
+
+  // Phase 1 ③：订阅令牌与管理密码按钮接线；订阅地址初始显示取服务端给的 subUrl。
+  const 订阅链接元素 = document.getElementById('subTokenLink');
+  const 订阅状态元素 = document.getElementById('subTokenStatus');
+  if (订阅链接元素) {
+    if (window.CFNEW.subUrl) {
+      订阅链接元素.href = window.CFNEW.subUrl;
+      订阅链接元素.textContent = window.CFNEW.subUrl;
+      if (订阅状态元素) 订阅状态元素.textContent = '订阅令牌有效。';
+    } else if (订阅状态元素) {
+      订阅状态元素.textContent = '订阅令牌已撤销，订阅地址已失效；轮换可生成新令牌。';
+    }
+  }
+  const 轮换按钮 = document.getElementById('rotateSubTokenBtn');
+  if (轮换按钮) 轮换按钮.addEventListener('click', 轮换订阅令牌);
+  const 撤销按钮 = document.getElementById('revokeSubTokenBtn');
+  if (撤销按钮) 撤销按钮.addEventListener('click', 撤销订阅令牌);
+  const 改密码按钮 = document.getElementById('changePasswordBtn');
+  if (改密码按钮) 改密码按钮.addEventListener('click', 修改管理密码);
+  const 退出按钮 = document.getElementById('logoutBtn');
+  if (退出按钮) 退出按钮.addEventListener('click', 退出登录);
 
   // 修改字段时把 FAB 标记为 "未保存"
   function 标记已修改() {
@@ -4862,4 +4975,29 @@ function createEngine(config, uuid) {
 return { render: request => 处理订阅值(request, uuid), subscribe: request => 处理订阅请求(request, uuid), defaults: 配置默认值 };
 }
 return createEngine(config, uuid);
+}
+
+// Phase 1 ③：管理登录页（独立管理密码）。不含任何配置内容；凭密码换会话，会话由面板以 HttpOnly cookie 种下。
+// 首次设置成功后自动再调一次登录，免得用户输两遍密码。
+export function renderLoginPage({ passwordSet, apiBase }) {
+  const isSetup = !passwordSet;
+  const apiBaseJson = JSON.stringify(apiBase);
+  return '<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>CFnew 管理登录</title><style>body{margin:0;background:#020617;color:#00f0ff;font-family:monospace;display:flex;align-items:center;justify-content:center;min-height:100vh}main{width:min(420px,92vw);border:1px solid #00f0ff;padding:28px;background:rgba(0,0,0,.9)}h1{margin:0 0 4px;font-size:1.4rem;text-shadow:0 0 5px #00f0ff}p{color:#7aa9c4;font-size:.9rem}input{width:100%;box-sizing:border-box;padding:12px;margin:8px 0;background:rgba(0,0,0,.8);border:1px solid #00f0ff;color:#00f0ff;font-family:monospace;font-size:14px}button{width:100%;padding:12px;margin-top:8px;background:rgba(0,0,0,.8);border:2px solid #00f0ff;color:#00f0ff;font-family:monospace;font-size:14px;cursor:pointer}#loginError{display:none;color:#ff3860;margin-top:10px;white-space:pre-wrap}small{color:#7aa9c4;font-size:.8rem}</style></head><body><main><h1>CFnew</h1><p>' + (isSetup ? '首次使用：设置管理密码（只存盐哈希，不存明文）。设好后订阅令牌会自动生成。' : '管理登录：输入管理密码。') + '</p>'
+    + (isSetup
+      ? '<input type="password" id="newPassword" placeholder="新密码（8–128 个字符）" autocomplete="new-password"><input type="password" id="newPasswordConfirm" placeholder="确认新密码" autocomplete="new-password"><button type="button" id="loginSubmit">设置管理密码</button>'
+      : '<input type="password" id="password" placeholder="管理密码" autocomplete="current-password"><button type="button" id="loginSubmit">登录</button>')
+    + '<div id="loginError" role="status"></div><p><small>忘密码时，在 Cloudflare 仪表板删除 KV 键 admin_pass 后刷新本页重新设置。</small></p></main><script>'
+    + 'var API_BASE=' + apiBaseJson + ';var IS_SETUP=' + (isSetup ? 'true' : 'false') + ';'
+    + 'function showError(m){var e=document.getElementById("loginError");e.textContent=m;e.style.display="block";}'
+    + 'async function postAuth(path,pw){var r=await fetch(API_BASE+path,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({password:pw})});var j=null;try{j=await r.json();}catch(e){}return{ok:r.ok&&j&&j.success===true,message:(j&&(j.message||j.error))||("请求失败（HTTP "+r.status+"）")};}'
+    + 'document.getElementById("loginSubmit").addEventListener("click",async function(){'
+    + 'var pw,cpw;'
+    + 'if(IS_SETUP){pw=document.getElementById("newPassword").value;cpw=document.getElementById("newPasswordConfirm").value;if(pw!==cpw){showError("两次输入的新密码不一致");return;}if(pw.length<8||pw.length>128){showError("密码长度须为 8–128 个字符");return;}}'
+    + 'else{pw=document.getElementById("password").value;if(!pw){showError("请输入管理密码");return;}}'
+    + 'try{var first=await postAuth(IS_SETUP?"/api/auth/setup":"/api/auth/login",pw);'
+    + 'if(!first.ok){showError(first.message);return;}'
+    + 'if(IS_SETUP){var second=await postAuth("/api/auth/login",pw);if(!second.ok){showError("密码已设置，请用新密码登录");window.location.reload();return;}}'
+    + 'window.location.reload();}catch(e){showError("请求失败："+e.message);}});'
+    + 'document.addEventListener("keydown",function(e){if(e.key==="Enter"){document.getElementById("loginSubmit").click();}});'
+    + '</script></body></html>';
 }
